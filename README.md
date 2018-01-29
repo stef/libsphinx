@@ -1,4 +1,4 @@
-libdecaf (goldilocks) based sphinx implementation
+libdecaf-based sphinx password storage implementation
 
 pitchforked sphinx is a cryptographic password storage as described in
 https://eprint.iacr.org/2015/1099
