@@ -1,9 +1,9 @@
 libdecaf (goldilocks) based sphinx implementation
 
-sphinx is a cryptographic password storage as described in
+pitchforked sphinx is a cryptographic password storage as described in
 https://eprint.iacr.org/2015/1099
 
-sphinx has a very simple interface
+pitchforked sphinx has a very simple interface
 
 ## step 1 - challenge
 the following creates a challenge for a device:
