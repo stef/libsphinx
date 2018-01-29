@@ -6,7 +6,7 @@ https://eprint.iacr.org/2015/1099
 pitchforked sphinx has a very simple interface
 
 ## step 1 - challenge
-the following creates a challenge for a device:
+The following creates a challenge for a device:
 ```
 echo -n "shitty master password" | ../challenge >c 2>b
 ```
