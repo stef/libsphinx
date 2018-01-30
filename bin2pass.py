@@ -44,30 +44,30 @@ def usage():
 if len(sys.argv)>3 or sys.argv in ('-h', '--help'):
     usage()
 
-size = 0
+if __name__ == '__main__':
+    size = 0
+    raw = sys.stdin.read(32)
 
-raw = sys.stdin.read(32)
+    if len(sys.argv)==1:
+        chars = sets['s']+sets['d']+sets['u']+sets['l']
 
-if len(sys.argv)==1:
-    chars = sets['s']+sets['d']+sets['u']+sets['l']
-
-elif len(sys.argv)==2: # figure out if set or size
-    try:
-        size = int(sys.argv[1])
-    except ValueError:
-        # probably a set specification
+    elif len(sys.argv)==2: # figure out if set or size
+        try:
+            size = int(sys.argv[1])
+        except ValueError:
+            # probably a set specification
+            chars = tuple(c for x in (sets[c] for c in ('s','u','l','d') if c in sys.argv[1]) for c in x)
+    else:
+        try:
+            size = int(sys.argv[2])
+        except ValueError:
+            usage();
         chars = tuple(c for x in (sets[c] for c in ('s','u','l','d') if c in sys.argv[1]) for c in x)
-else:
-    try:
-        size = int(sys.argv[2])
-    except ValueError:
-        usage();
-    chars = tuple(c for x in (sets[c] for c in ('s','u','l','d') if c in sys.argv[1]) for c in x)
 
-if size<0:
-    print "error size must be < 0"
-    usage()
+    if size<0:
+        print "error size must be < 0"
+        usage()
 
-password = encode(raw,chars)
-if size>0: password=password[:size]
-print password
+    password = encode(raw,chars)
+    if size>0: password=password[:size]
+    print password
