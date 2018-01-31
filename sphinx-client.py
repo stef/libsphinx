@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import pysodium, sys, os, asyncio, subprocess, io, struct, binascii
+import pysodium, sys, os, asyncio, io, struct, binascii, sphinx
 import bin2pass
 
 verbose = False
@@ -32,7 +32,7 @@ class SphinxClientProtocol(asyncio.Protocol):
     if not self.b:
         return
 
-    rwd=finish(self.b, data)
+    rwd=sphinx.finish(self.b, data)
 
     rule = getrule(datadir, id)
     if not rule:
@@ -104,14 +104,8 @@ def usage():
   sys.exit(1)
 
 def challenge():
-  res=subprocess.run(['./challenge'], stdin=sys.stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  res.check_returncode()
-  return res.stderr, res.stdout
-
-def finish(b, resp):
-  res=subprocess.run(['./derive', b], input=resp, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  res.check_returncode()
-  return res.stdout
+  pwd = sys.stdin.buffer.read()
+  return sphinx.challenge(pwd)
 
 if __name__ == '__main__':
   if ((len(sys.argv) > 1 and sys.argv[1]!='create' and len(sys.argv) != 4) or

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import asyncio, datetime, pysodium, os, binascii, subprocess, shutil
+import asyncio, datetime, pysodium, os, binascii, shutil, sphinx
 
 verbose = False
 address = '127.0.0.1'
@@ -12,18 +12,22 @@ GET=0x66
 CHANGE=0xaa
 DELETE=0xff
 
-def respond(input, id):
+def respond(chal, id):
   keyf = datadir+binascii.hexlify(id).decode()+'/key'
   if not os.path.exists(keyf):
     print(keyf,'not exist')
     return b'fail' # key not found
 
-  res=subprocess.run(['./respond', keyf], input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  with open(keyf,'rb') as fd:
+    secret = fd.read()
+
+  if len(secret)!= sphinx.DECAF_255_SCALAR_BYTES:
+    return b'fail'
+
   try:
-      res.check_returncode()
-  except subprocess.CalledProcessError:
-      return b'fail'
-  return res.stdout
+    return sphinx.respond(chal, secret)
+  except ValueError:
+    return b'fail'
 
 class SphinxOracleProtocol(asyncio.Protocol):
   def connection_made(self, transport):
