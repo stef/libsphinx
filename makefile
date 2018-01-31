@@ -14,6 +14,9 @@ LDFLAGS=-g $(LIBS)
 
 all: sphinx challenge respond derive
 
+$(objs):
+	cd goldilocks; make
+
 sphinx: $(objs) sphinx.c
 	gcc $(CFLAGS) -o sphinx sphinx.c $(LDFLAGS) $(objs)
 
