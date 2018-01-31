@@ -1,22 +1,23 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys, struct, math
+from itertools import chain
 
 sets = {
     # symbols
-    's': tuple(chr(x) for x in range(32,48)+range(58,65)+range(91,97)+range(123,127)),
+    's': tuple(bytes([x]) for x in chain(range(32,48),range(58,65),range(91,97),range(123,127))),
     # digits
-    'd': tuple(chr(x) for x in range(48,58)),
+    'd': tuple(bytes([x]) for x in range(48,58)),
     # upper-case
-    'u': tuple(chr(x) for x in range(65,91)),
+    'u': tuple(bytes([x]) for x in range(65,91)),
     # lower-case
-    'l': tuple(chr(x) for x in range(97,123))}
+    'l': tuple(bytes([x]) for x in range(97,123))}
 
 def encode(raw, chars):
     l = len(raw)
     r = l % 4
     if r:
-        raw += '\0' * (4 - r)
+        raw += b'\0' * (4 - r)
     longs = len(raw) >> 2
     out = []
     words = struct.unpack('>%dL' % (longs), raw)
@@ -24,29 +25,35 @@ def encode(raw, chars):
     char_size = len(chars)
     out_fact=int(math.log(2**32, char_size))+1
     for word in words:
-        for _ in xrange(out_fact):
+        for _ in range(out_fact):
             word, r = divmod(word, char_size)
             out += chars[r]
 
-    out = ''.join(out)
+    #out = b''.join(out)
 
     # Trim padding
     olen = l % 4
     if olen:
         olen += 1
     olen += l / 4 * out_fact
-    return out[:olen]
+    return bytes(out[:int(olen)])
+
+def derive(rwd,rule,size):
+    chars = tuple(c for x in (sets[c] for c in ('s','u','l','d') if c in rule) for c in x)
+    password = encode(rwd,chars)
+    if size>0: password=password[:size]
+    return password
 
 def usage():
-    print "usage: %s [d|u|s|l] [<max size>] <binary\tgenerate password with [d]igits/[u]pper/[l]ower/[s]ymbols of <max size> {default: duls}" % sys.argv[0]
+    print("usage: %s [d|u|s|l] [<max size>] <binary\tgenerate password with [d]igits/[u]pper/[l]ower/[s]ymbols of <max size> {default: duls}" % sys.argv[0])
     sys.exit(0)
 
-if len(sys.argv)>3 or sys.argv in ('-h', '--help'):
-    usage()
-
 if __name__ == '__main__':
+    if len(sys.argv)>3 or sys.argv in ('-h', '--help'):
+        usage()
+
     size = 0
-    raw = sys.stdin.read(32)
+    raw = sys.stdin.buffer.read(32)
 
     if len(sys.argv)==1:
         chars = sets['s']+sets['d']+sets['u']+sets['l']
@@ -56,18 +63,16 @@ if __name__ == '__main__':
             size = int(sys.argv[1])
         except ValueError:
             # probably a set specification
-            chars = tuple(c for x in (sets[c] for c in ('s','u','l','d') if c in sys.argv[1]) for c in x)
+            rule = sys.argv[1]
     else:
         try:
             size = int(sys.argv[2])
         except ValueError:
             usage();
-        chars = tuple(c for x in (sets[c] for c in ('s','u','l','d') if c in sys.argv[1]) for c in x)
+        rule = sys.argv[1]
 
     if size<0:
-        print "error size must be < 0"
+        print("error size must be < 0")
         usage()
 
-    password = encode(raw,chars)
-    if size>0: password=password[:size]
-    print password
+    print(derive(raw,rule,size))
