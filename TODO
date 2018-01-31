@@ -1,0 +1,2 @@
+* authenticate oracle to clients using signature
+* use decaf signature instead of sodium.
