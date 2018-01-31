@@ -15,74 +15,79 @@
     You should have received a copy of the GNU General Public License
     along with pitchforked sphinx. If not, see <http://www.gnu.org/licenses/>.
 */
-#include <stdio.h>
+#include <stdint.h>
 #include <decaf.h>
 #include <randombytes.h>
 #include <crypto_generichash.h>
 
-void dump(const decaf_255_point_t pt, char* m) {
-  int i;
-  uint8_t ser[DECAF_255_SER_BYTES];
-  decaf_255_point_encode(ser, pt);
+/* params:
+ *
+ * pwd, p_len: (input) the master password and its length
+ * bfac: (output) pointer to array of DECAF_255_SCALAR_BYTES (32) bytes - the blinding factor
+ * chal: (output) pointer to array of DECAF_255_SER_BYTES (32) bytes - the challenge
+ */
+void challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *chal) {
+  unsigned char hash[DECAF_255_HASH_BYTES];
+  crypto_generichash(hash, sizeof hash, pwd, p_len, 0, 0);
+  // hashed_to_point with elligator the password hash
+  decaf_255_point_t P;
+  decaf_255_point_from_hash_nonuniform(P, hash);
 
-  printf("%s", m);
-  for(i=0;i<sizeof(ser);i++) {
-    printf("%02x",ser[i]);
-  }
-  printf("\n");
+  // generate random blinding factor
+  randombytes(bfac, DECAF_255_SCALAR_BYTES); // random blinding factor
+
+  // convert the blinding factor into a scalar
+  decaf_255_scalar_t b;
+  decaf_255_scalar_decode_long(b, bfac, DECAF_255_SCALAR_BYTES);
+
+  // blind the message: C=Pb
+  decaf_255_point_t challenge;
+  decaf_255_point_scalarmul(challenge, P, b);
+
+  // serialize the challenge
+  decaf_255_point_encode(chal, challenge);
 }
 
-int main(void) {
-  unsigned char m[]="shitty master password", x[32], y[32];
-  randombytes(x, sizeof(x)); // blinding factor
-  randombytes(y, sizeof(y)); // the pitchfork secret
+/* params
+ * chal: (input) the challenge, DECAF_255_SER_BYTES (32) bytes array
+ * secret: (input) the secret contributing, DECAF_255_SCALAR_BYTES (32) bytes array
+ * resp: (output) the response, DECAF_255_SER_BYTES (32) bytes array
+ */
+int respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
+  // deserialize challenge into C
+  decaf_255_point_t C, R;
+  if(DECAF_SUCCESS!=decaf_255_point_decode(C, chal, DECAF_FALSE)) return 1;
 
-  // the message to be blinded - hashed_to_point with elligator
-  unsigned char hash[DECAF_255_HASH_BYTES];
-  crypto_generichash(hash, sizeof hash, m, sizeof m, 0, 0);
-  decaf_255_point_t M;
-  decaf_255_point_from_hash_nonuniform(M, hash);
+  // peer contributes their own secret: R=Cy
+  decaf_255_scalar_t key;
+  decaf_255_scalar_decode_long(key, secret, DECAF_255_SCALAR_BYTES);
+  decaf_255_point_scalarmul(R, C, key);
 
-  // what is the expected value: Y=My
-  //if(crypto_scalarmult(Y,M,y)!=0) return 1;
-  decaf_255_scalar_t tmp;
-  decaf_255_point_t Y;
-  decaf_255_scalar_decode_long(tmp, y, sizeof(y));
-  decaf_255_point_scalarmul(Y, M, tmp);
+  decaf_255_point_encode(resp, R);
+  return 0;
+}
 
-  // simulate blinded protocol
-
-  // blind the message: X=Mx
-  decaf_255_point_t X;
-  decaf_255_scalar_decode_long(tmp, x, sizeof(x));
-  decaf_255_point_scalarmul(X, M, tmp);
-
-  dump(X,"X: ");
-  printf("y: ");
-  int i;
-  for(i=0;i<sizeof(y);i++) {
-    printf("%02x",y[i]);
-  }
-  printf("\n");
-  // peer contributes their own secret: R=Xy
-  decaf_255_point_t R;
-  decaf_255_scalar_decode_long(tmp, y, sizeof(y));
-  decaf_255_point_scalarmul(R, X, tmp);
-
-  dump(R,"R: ");
+/* params
+ * bfac: (input) bfac from challenge(), array of DECAF_255_SCALAR_BYTES (32) bytes
+ * resp: (input) the response from respond(), DECAF_255_SER_BYTES (32) bytes array
+ * rwd: (output) the derived password, DECAF_255_SER_BYTES (32) bytes array
+ */
+int finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
+  // decode blinding factor into scalar
+  decaf_255_scalar_t b;
+  decaf_255_scalar_decode_long(b, bfac, DECAF_255_SCALAR_BYTES);
 
   // calculate 1/x, so we can unblind R
-  decaf_255_scalar_decode_long(tmp, x, sizeof(x));
-  if(decaf_255_scalar_invert(tmp, tmp)!=DECAF_SUCCESS) return 1;
+  if(decaf_255_scalar_invert(b, b)!=DECAF_SUCCESS) return 1;
+
+  // decode response into point
+  decaf_255_point_t R;
+  if(DECAF_SUCCESS!=decaf_255_point_decode(R, resp, DECAF_FALSE)) return 1;
 
   // unblind the response from the peer: Y1=R/x
-  decaf_255_point_t Y1;
-  decaf_255_point_scalarmul(Y1, R, tmp);
+  decaf_255_point_t Y;
+  decaf_255_point_scalarmul(Y, R, b);
 
-  // Y1 should be equal Y
-  dump(Y,"Y: ");
-  dump(Y1,"Y1:");
-  printf("Y==Y1 is %d\n", DECAF_TRUE==decaf_255_point_eq(Y1,Y));
-
+  decaf_255_point_encode(rwd, Y);
   return 0;
 }

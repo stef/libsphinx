@@ -12,22 +12,25 @@ LIBS=-lsodium
 CFLAGS=$(INC) -Wall -Os
 LDFLAGS=-g $(LIBS)
 
-all: sphinx challenge respond derive
+all: standalone/challenge standalone/respond standalone/derive libsphinx.so tests/test
 
 $(objs):
 	cd goldilocks; make
 
-sphinx: $(objs) sphinx.c
-	gcc $(CFLAGS) -o sphinx sphinx.c $(LDFLAGS) $(objs)
+standalone/challenge: $(objs) standalone/challenge.c
+	gcc $(CFLAGS) -o standalone/challenge standalone/challenge.c $(LDFLAGS) $(objs)
 
-challenge: $(objs) challenge.c
-	gcc $(CFLAGS) -o challenge challenge.c $(LDFLAGS) $(objs)
+standalone/respond: $(objs) standalone/respond.c
+	gcc $(CFLAGS) -o standalone/respond standalone/respond.c $(LDFLAGS) $(objs)
 
-respond: $(objs) respond.c
-	gcc $(CFLAGS) -o respond respond.c $(LDFLAGS) $(objs)
+standalone/derive: $(objs) standalone/derive.c
+	gcc $(CFLAGS) -o standalone/derive standalone/derive.c $(LDFLAGS) $(objs)
 
-derive: $(objs) derive.c
-	gcc $(CFLAGS) -o derive derive.c $(LDFLAGS) $(objs)
+libsphinx.so: $(objs) sphinx.o
+	$(CC) -shared -fpic $(CFLAGS) -o $@ $(objs) sphinx.o $(LDFLAGS)
+
+tests/test: test.c libsphinx.so
+	gcc $(CFLAGS) -o tests/test test.c -lsphinx $(LDFLAGS) $(objs)
 
 clean:
-	@rm sphinx challenge respond derive
+	@rm -f standalone/sphinx standalone/challenge standalone/respond standalone/derive libsphinx.so *.o *.pyc || true
