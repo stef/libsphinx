@@ -32,6 +32,7 @@ void challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *c
   // hashed_to_point with elligator the password hash
   decaf_255_point_t P;
   decaf_255_point_from_hash_nonuniform(P, hash);
+  decaf_bzero(hash, sizeof(hash));
 
   // generate random blinding factor
   randombytes(bfac, DECAF_255_SCALAR_BYTES); // random blinding factor
@@ -43,9 +44,12 @@ void challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *c
   // blind the message: C=Pb
   decaf_255_point_t challenge;
   decaf_255_point_scalarmul(challenge, P, b);
+  decaf_255_scalar_destroy(b);
+  decaf_255_point_destroy(P);
 
   // serialize the challenge
   decaf_255_point_encode(chal, challenge);
+  decaf_255_point_destroy(challenge);
 }
 
 /* params
@@ -63,8 +67,12 @@ int respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
   decaf_255_scalar_t key;
   decaf_255_scalar_decode_long(key, secret, DECAF_255_SCALAR_BYTES);
   decaf_255_point_scalarmul(R, C, key);
+  decaf_255_scalar_destroy(key);
+  decaf_255_point_destroy(C);
 
   decaf_255_point_encode(resp, R);
+  decaf_255_point_destroy(R);
+
   return 0;
 }
 
@@ -89,7 +97,10 @@ int finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
   // unblind the response from the peer: Y1=R/x
   decaf_255_point_t Y;
   decaf_255_point_scalarmul(Y, R, b);
+  decaf_255_scalar_destroy(b);
+  decaf_255_point_destroy(R);
 
   decaf_255_point_encode(rwd, Y);
+  decaf_255_point_destroy(Y);
   return 0;
 }
