@@ -48,15 +48,20 @@ static void oprf(const uint8_t *x, const size_t x_len, const uint8_t *k, uint8_t
   // H0 ^ k
   decaf_255_point_t H0_k;
   decaf_255_point_scalarmul(H0_k, H0, K);
+  decaf_255_scalar_destroy(K);
+  decaf_255_point_destroy(H0);
 
   // h0 := (H0(x))^k
   decaf_255_point_encode(h0, H0_k);
+  decaf_255_point_destroy(H0_k);
 
   crypto_generichash_state state;
   crypto_generichash_init(&state, 0, 0, 32);
   crypto_generichash_update(&state, x, x_len);
   crypto_generichash_update(&state, h0, 32);
   crypto_generichash_final(&state, res, 32);
+  decaf_bzero(&state, sizeof(state));
+  decaf_bzero(h0, sizeof(h0));
 }
 
 // sends c, C, k_s , P_u , m_u to server
@@ -85,6 +90,7 @@ void client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_s,  
   crypto_generichash_update(&state, rwd, rwd_len);
   crypto_generichash_update(&state, c, 32);
   crypto_generichash_final(&state, C, 32);
+  decaf_bzero(r, sizeof(r));
 
   // p_u = f_z(1) mod q
   uint8_t p_u[DECAF_X25519_PRIVATE_BYTES];
@@ -93,6 +99,7 @@ void client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_s,  
 
   // computes P_u = g^p_u
   decaf_x25519_derive_public_key(P_u, p_u);
+  decaf_bzero(p_u, sizeof(p_u));
 
   // m_u = f_z (2, P_u, P_s)
   memset(tmp,2,32);
@@ -101,6 +108,8 @@ void client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_s,  
   crypto_generichash_update(&state, P_u, 32);
   crypto_generichash_update(&state, P_s, 32);
   crypto_generichash_final(&state, m_u, 32);
+  decaf_bzero(&state, sizeof(state));
+  decaf_bzero(z, sizeof(z));
 }
 
 // done by user
@@ -119,8 +128,11 @@ void start_pake(const uint8_t *rwd, const size_t rwd_len, // input params
   crypto_generichash(h0, sizeof h0, rwd, rwd_len, 0, 0);
   decaf_255_point_t H0;
   decaf_255_point_from_hash_nonuniform(H0, h0);
+  decaf_bzero(h0, sizeof(h0));
   decaf_255_point_scalarmul(H0, H0, p);
+  decaf_255_scalar_destroy(p);
   decaf_255_point_encode(alpha, H0);
+  decaf_255_point_destroy(H0);
 
   // X_u = g^x_u
   decaf_x25519_derive_public_key(X_u, x_u);
@@ -138,6 +150,8 @@ static void derive_secret(uint8_t *mk, const uint8_t *sec) {
   crypto_generichash(mk, DECAF_X25519_PUBLIC_BYTES,  // output
                      zero, 32,                       // msg
                      hashkey, sizeof(hashkey));      // key
+
+  decaf_bzero(hashkey, sizeof(hashkey));
 }
 
 static int server_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], const uint8_t Ip[32], const uint8_t Ep[32]) {
@@ -176,7 +190,10 @@ int server_pake(const uint8_t alpha[32], const uint8_t X_u[32],  // input params
   decaf_255_scalar_t K_s;
   decaf_255_scalar_decode_long(K_s, k_s, 32);
   decaf_255_point_scalarmul(Beta, Alpha, K_s);
+  decaf_255_point_destroy(Alpha);
+  decaf_255_scalar_destroy(K_s);
   decaf_255_point_encode(beta, Beta);
+  decaf_255_point_destroy(Beta);
 
   // X_s = g^x_s
   decaf_x25519_derive_public_key(X_s, x_s);
@@ -184,6 +201,7 @@ int server_pake(const uint8_t alpha[32], const uint8_t X_u[32],  // input params
   // Computes K = KE(p_s , x_s , P_u , X_u)
   // and outputs session key SK = f_K(0)
   server_kex(SK, p_s, x_s, P_u, X_u);
+  decaf_bzero(x_s, sizeof(x_s));
 
   return 0;
 }
@@ -223,8 +241,11 @@ int user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
   decaf_255_point_t H0, Beta;
   if(DECAF_SUCCESS!=decaf_255_point_decode(Beta, beta, DECAF_FALSE)) return 1;
   decaf_255_point_scalarmul(H0, Beta, p);
+  decaf_255_scalar_destroy(p);
+  decaf_255_point_destroy(Beta);
   uint8_t h0[32], h[32];
   decaf_255_point_encode(h0, H0);
+  decaf_255_point_destroy(H0);
 
   // h = H(rwd, β^(1/ρ))
   crypto_generichash_state state;
@@ -232,6 +253,7 @@ int user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
   crypto_generichash_update(&state, rwd, rwd_len);
   crypto_generichash_update(&state, h0, 32);
   crypto_generichash_final(&state, h, 32);
+  decaf_bzero(h0, sizeof(h0));
 
   // z = c ⊕ H(rwd, β^(1/ρ))
   uint8_t z[32];
@@ -257,20 +279,35 @@ int user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
   crypto_generichash_update(&state, rwd, rwd_len);
   crypto_generichash_update(&state, c, 32);
   crypto_generichash_final(&state, h, 32);
-  if(sodium_memcmp(h,C,32)!=0) return 1;
+  decaf_bzero(r, sizeof(r));
+  if(sodium_memcmp(h,C,32)!=0) {
+    decaf_bzero(h, sizeof(h));
+    decaf_bzero(&state, sizeof(state));
+    decaf_bzero(z, sizeof(z));
+    decaf_bzero(p_u, sizeof(p_u));
+    return 1;
+  }
 
   // calculate f_z(2,P_u,P_s)
-  crypto_generichash_init(&state, z, 32, 32);
   memset(tmp,2,32);
+  crypto_generichash_init(&state, z, 32, 32);
   crypto_generichash_update(&state, tmp, 32);
   crypto_generichash_update(&state, P_u, 32);
   crypto_generichash_update(&state, P_s, 32);
   crypto_generichash_final(&state, h, 32);
   // abort if m_u != f_z(2,P_u,P_s)
-  if(sodium_memcmp(h,m_u,32)!=0) return 1;
+  decaf_bzero(&state, sizeof(state));
+  decaf_bzero(z, sizeof(z));
+  if(sodium_memcmp(h,m_u,32)!=0) {
+    decaf_bzero(h, sizeof(h));
+    decaf_bzero(p_u, sizeof(p_u));
+    return 1;
+  }
+  decaf_bzero(h, sizeof(h));
 
   // calculate shared secret of PAKE
   user_kex(SK, p_u, x_u, P_s, X_s);
+  decaf_bzero(p_u, sizeof(p_u));
 
   return 0;
 }
