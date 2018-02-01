@@ -25,6 +25,13 @@ class SphinxClientProtocol(asyncio.Protocol):
 
   def data_received(self, data):
     if verbose: print('Data received: {!r}'.format(data.decode()))
+
+    try:
+      data = pysodium.crypto_sign_open(data, serverkey)
+    except ValueError:
+      print('invalid signature.\nabort')
+      return
+
     if data == b'fail':
         print('fail')
         return
@@ -98,6 +105,16 @@ def getrule(datadir, id):
   except FileNotFoundError:
       return None
 
+def getserverkey(datadir):
+  datadir = os.path.expanduser(datadir)
+  try:
+    with open(datadir+'server-key.pub', 'rb') as fd:
+      key = fd.read()
+    return key
+  except FileNotFoundError:
+    print("no server key found, please install it")
+    sys.exit(1)
+
 def usage():
   print("usage: %s <create> <user> <site> [u][l][d][s] [<size>]" % sys.argv[0])
   print("usage: %s <get|change|delete> <user> <site>" % sys.argv[0])
@@ -114,6 +131,7 @@ if __name__ == '__main__':
 
   sk = getkey(datadir)
   salt = getsalt(datadir)
+  serverkey = getserverkey(datadir)
   id = pysodium.crypto_generichash(''.join((sys.argv[2],sys.argv[3])), salt, 32)
   b = None
 

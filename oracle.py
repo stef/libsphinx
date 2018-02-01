@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-import asyncio, datetime, pysodium, os, binascii, shutil, sphinx
+import asyncio, datetime, pysodium, os, binascii, shutil, sphinx, sys
 
 verbose = False
 address = '127.0.0.1'
 port = 2355
 datadir = 'data/'
+keydir = '~/.sphinx/'
+key = None
 
 CREATE=0x00
 GET=0x66
@@ -155,26 +157,52 @@ class SphinxOracleProtocol(asyncio.Protocol):
     if verbose:
       print('Send: {!r}'.format(res))
 
+    res=pysodium.crypto_sign(res,key)
     self.transport.write(res)
 
     if verbose:
       print('Close the client socket')
     self.transport.close()
 
-loop = asyncio.get_event_loop()
-# Each client connection will create a new protocol instance
-coro = loop.create_server(SphinxOracleProtocol, address, port)
-server = loop.run_until_complete(coro)
+def getkey(keydir):
+  datadir = os.path.expanduser(keydir)
+  try:
+    with open(datadir+'server-key', 'rb') as fd:
+      key = fd.read()
+    return key
+  except FileNotFoundError:
+    print("no server key found, generating...")
+    if not os.path.exists(datadir):
+      os.mkdir(datadir,0o700)
+    pk, sk = pysodium.crypto_sign_keypair()
+    with open(datadir+'server-key','wb') as fd:
+      os.fchmod(fd.fileno(),0o600)
+      fd.write(sk)
+    with open(datadir+'server-key.pub','wb') as fd:
+      fd.write(pk)
+    print("please share `%s` with all clients"  % (datadir+'server-key.pub'))
+    return sk
 
-# Serve requests until Ctrl+C is pressed
-if verbose:
-  print('Serving on {}'.format(server.sockets[0].getsockname()))
-try:
-  loop.run_forever()
-except KeyboardInterrupt:
-  pass
+if __name__ == '__main__':
+  loop = asyncio.get_event_loop()
+  # Each client connection will create a new protocol instance
+  coro = loop.create_server(SphinxOracleProtocol, address, port)
+  server = loop.run_until_complete(coro)
 
-# Close the server
-server.close()
-loop.run_until_complete(server.wait_closed())
-loop.close()
+  key = getkey(keydir)
+  if key == None:
+    print("no signing key available.\nabort")
+    sys.exit(1)
+
+  # Serve requests until Ctrl+C is pressed
+  if verbose:
+    print('Serving on {}'.format(server.sockets[0].getsockname()))
+  try:
+    loop.run_forever()
+  except KeyboardInterrupt:
+    pass
+
+  # Close the server
+  server.close()
+  loop.run_until_complete(server.wait_closed())
+  loop.close()

@@ -1,2 +1,2 @@
-* authenticate oracle to clients using signature
+* clean objects on stack in sphinx/pake
 * use decaf signature instead of sodium.
