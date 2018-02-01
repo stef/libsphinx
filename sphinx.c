@@ -52,6 +52,7 @@ void challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *c
  * chal: (input) the challenge, DECAF_255_SER_BYTES (32) bytes array
  * secret: (input) the secret contributing, DECAF_255_SCALAR_BYTES (32) bytes array
  * resp: (output) the response, DECAF_255_SER_BYTES (32) bytes array
+ * returns 1 on error, 0 on success
  */
 int respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
   // deserialize challenge into C
@@ -71,6 +72,7 @@ int respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
  * bfac: (input) bfac from challenge(), array of DECAF_255_SCALAR_BYTES (32) bytes
  * resp: (input) the response from respond(), DECAF_255_SER_BYTES (32) bytes array
  * rwd: (output) the derived password, DECAF_255_SER_BYTES (32) bytes array
+ * returns 1 on error, 0 on success
  */
 int finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
   // decode blinding factor into scalar
