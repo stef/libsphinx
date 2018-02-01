@@ -24,6 +24,7 @@
 #include "decaf.h"
 #include <crypto_generichash.h>
 #include <randombytes.h>
+#include <sodium/utils.h>
 
 // server shares pk as P_s with client_init
 void server_init(uint8_t *p_s, uint8_t *P_s) {
@@ -256,7 +257,7 @@ int user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
   crypto_generichash_update(&state, rwd, rwd_len);
   crypto_generichash_update(&state, c, 32);
   crypto_generichash_final(&state, h, 32);
-  if(memcmp(h,C,32)!=0) return 1;
+  if(sodium_memcmp(h,C,32)!=0) return 1;
 
   // calculate f_z(2,P_u,P_s)
   crypto_generichash_init(&state, z, 32, 32);
@@ -266,7 +267,7 @@ int user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
   crypto_generichash_update(&state, P_s, 32);
   crypto_generichash_final(&state, h, 32);
   // abort if m_u != f_z(2,P_u,P_s)
-  if(memcmp(h,m_u,32)!=0) return 1;
+  if(sodium_memcmp(h,m_u,32)!=0) return 1;
 
   // calculate shared secret of PAKE
   user_kex(SK, p_u, x_u, P_s, X_s);
