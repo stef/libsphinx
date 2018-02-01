@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with pitchforked sphinx. If not, see <http://www.gnu.org/licenses/>.
 
-    This file implements the FK-PTR-PAKE with PKI-free PAKE protocol
+    This file implements the PKI-free PAKE protocol
     as specified on page 18 of: https://eprint.iacr.org/2015/1099
 */
 
