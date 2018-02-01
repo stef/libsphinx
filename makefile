@@ -12,7 +12,11 @@ LIBS=-lsodium
 CFLAGS=$(INC) -Wall -Os
 LDFLAGS=-g $(LIBS)
 
-all: standalone/challenge standalone/respond standalone/derive libsphinx.so tests/test
+all: standalone libsphinx.so tests
+
+standalone: standalone/challenge standalone/respond standalone/derive
+
+tests: tests/pake tests/sphinx
 
 $(objs):
 	cd goldilocks; make
@@ -26,11 +30,18 @@ standalone/respond: $(objs) standalone/respond.c
 standalone/derive: $(objs) standalone/derive.c
 	gcc $(CFLAGS) -o standalone/derive standalone/derive.c $(LDFLAGS) $(objs)
 
-libsphinx.so: $(objs) sphinx.o
-	$(CC) -shared -fpic $(CFLAGS) -o $@ $(objs) sphinx.o $(LDFLAGS)
+libsphinx.so: $(objs) sphinx.o pake.o
+	$(CC) -shared -fpic $(CFLAGS) -o $@ $(objs) pake.o sphinx.o $(LDFLAGS)
 
-tests/test: test.c libsphinx.so
-	gcc $(CFLAGS) -o tests/test test.c -lsphinx $(LDFLAGS) $(objs)
+tests/sphinx: test.c libsphinx.so
+	gcc $(CFLAGS) -o tests/sphinx test.c -lsphinx $(LDFLAGS) $(objs)
+
+tests/pake: pake-test.c libsphinx.so
+	gcc $(CFLAGS) -o tests/pake pake-test.c -lsphinx $(LDFLAGS) $(objs)
 
 clean:
 	@rm -f standalone/sphinx standalone/challenge standalone/respond standalone/derive libsphinx.so *.o *.pyc || true
+	@rm -f tests/sphinx tests/pake || true
+	@rm -rf __pycache__ || true
+
+.PHONY: standalone clean
