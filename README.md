@@ -246,7 +246,7 @@ password on standard input to the client, and provide parameters like
 in this example:
 
 ```
-echo 'my master password | ./sphinx-client.py create username https://example.com ulsd 0
+echo 'my master password' | ./sphinx-client.py create username https://example.com ulsd 0
 ```
 
 The parameters to the client are `create` for the operation, then
@@ -265,7 +265,7 @@ Getting a password from the sphinx oracle works by running the
 following command:
 
 ```
-echo 'my master password | ./sphinx-client.py get username https://example.com
+echo 'my master password' | ./sphinx-client.py get username https://example.com
 ```
 
 Here again you supply your master password on standard input, provide
