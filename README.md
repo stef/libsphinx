@@ -16,17 +16,17 @@ python and simple command-line binaries.
 ## What is this thing?
 
 It allows you to have only a few (at least one) passwords that you
-need to remember, while at the same time provides unique 40 character
-long very random passwords (256 bit entropy). Your master password is
-encrypted (blinded) and sent to the password storage server which
-(without decrypting) combines your encrypted password with a big
-random number and sends this (still encrypted) back to you, where you
-can decrypt it (it's a kind of end-to-end encryption of passwords) and
-use the resulting unique, strong and very random password to
-register/login to various services. The resulting strong passwords
-make offline password cracking attempts infeasible. If say you use
-this with google and their password database is leaked your password
-will still be safe.
+need to remember, while at the same time provides unique 40 (ASCII)
+character long very random passwords (256 bit entropy). Your master
+password is encrypted (blinded) and sent to the password storage
+server which (without decrypting) combines your encrypted password
+with a big random number and sends this (still encrypted) back to you,
+where you can decrypt it (it's a kind of end-to-end encryption of
+passwords) and use the resulting unique, strong and very random
+password to register/login to various services. The resulting strong
+passwords make offline password cracking attempts infeasible. If say
+you use this with google and their password database is leaked your
+password will still be safe.
 
 How is this different from my password storage which stores the
 passwords in an encrypted database? Most importantly using an
