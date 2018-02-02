@@ -1,11 +1,45 @@
 libdecaf-based sphinx password storage implementation
 
+sphinx: a password *S*tore that *P*erfectly *H*ides from *I*tself
+(*N*o *X*aggeration)
+
 pitchforked sphinx is a cryptographic password storage as described in
 https://eprint.iacr.org/2015/1099
 
+and as presented by the Levchin Prize winner 2018 Hugo Krawczyk on
+Real World Crypto https://www.youtube.com/watch?v=px8hiyf81iM
+
 pitchforked sphinx comes with variety of interfaces: a library, a
 python wrapper around that library, a network server/client written in
-python, and simple command-line binaries.
+python and simple command-line binaries.
+
+## What is this thing?
+
+It allows you to have only a few (at least one) passwords that you
+need to remember, while at the same time provides unique 40 character
+long very random passwords (256 bit entropy). Your master password is
+encrypted (blinded) and sent to the password storage server which
+(without decrypting) combines your encrypted password with a big
+random number and sends this (still encrypted) back to you, where you
+can decrypt it (it's a kind of end-to-end encryption of passwords) and
+use the resulting unique, strong and very random password to
+register/login to various services. The resulting strong passwords
+make offline password cracking attempts infeasible. If say you use
+this with google and their password database is leaked your password
+will still be safe.
+
+How is this different from my password storage which stores the
+passwords in an encrypted database? Most importantly using an
+encrypted database is not "end-to-end" encrypted. Your master password
+is used to decrypt the database read out the password and send it back
+to you. This means whoever has your database can try to crack your
+master password on it, or can capture your master password while you
+type or send it over the network. Then all your passwords are
+compromised. If some attacker compromises your traditional password
+store it's mostly game over for you. Using sphinx the attacker
+controlling your password store learns nothing about your master nor
+your individual passwords. Also even if your strong password leaks,
+it's unique and cannot be used to login to other sites or services.
 
 ## Installing
 
@@ -124,7 +158,7 @@ function return 1, otherwise 0.
 
 Pitchforked sphinx also comes with a python wrapper, so you can build
 whatever you fancy immediately in python. The interface exposed wraps
-the 3 functions from the library like this:
+the 3 sphinx functions from the library like this:
 
 ```
 def challenge(pwd)
@@ -144,6 +178,7 @@ def finish(bfac, resp)
 
 returns the raw 32 byte password.
 
+The functions for the PAKE protocol are not yet exposed.
 
 ## Server/Client
 
