@@ -83,7 +83,7 @@ def getsalt(datadir):
       fd.write(salt)
     return salt
 
-def saverules(datadir, id, rules, size):
+def saverules(datadir, id, rules, size, user):
   datadir = os.path.expanduser(datadir+'/rules/')
   if not os.path.exists(datadir):
       os.mkdir(datadir,0o700)
@@ -91,8 +91,24 @@ def saverules(datadir, id, rules, size):
   rules = sum(1<<i for i, c in enumerate(('u','l','s','d')) if c in rules)
   # pack rule
   rule=(rules << 7) | (size & 0x7f)
-  with open(datadir+binascii.hexlify(id).decode(), 'wb') as fd:
-      fd.write(struct.pack('>H', rule))
+  fname = datadir+binascii.hexlify(id).decode()
+  if not os.path.exists(fname):
+    with open(fname, 'wb') as fd:
+        fd.write(struct.pack('>H', rule))
+        fd.write(user)
+  else:
+    with open(fname, 'ab') as fd:
+        fd.write(b"\n"+user)
+
+def getusers(datadir, id):
+  datadir = os.path.expanduser(datadir+'/rules/')
+  try:
+    with open(datadir+binascii.hexlify(id).decode(), 'rb') as fd:
+      # skip rules
+      fd.seek(2)
+      return [x.strip() for x in fd.readlines()]
+  except FileNotFoundError:
+      return None
 
 def getrule(datadir, id):
   datadir = os.path.expanduser(datadir+'/rules/')
@@ -116,8 +132,9 @@ def getserverkey(datadir):
     sys.exit(1)
 
 def usage():
-  print("usage: %s <create> <user> <site> [u][l][d][s] [<size>]" % sys.argv[0])
+  print("usage: %s create <user> <site> [u][l][d][s] [<size>]" % sys.argv[0])
   print("usage: %s <get|change|delete> <user> <site>" % sys.argv[0])
+  print("usage: %s list <site>" % sys.argv[0])
   sys.exit(1)
 
 def challenge():
@@ -125,18 +142,22 @@ def challenge():
   return sphinx.challenge(pwd)
 
 if __name__ == '__main__':
-  if ((len(sys.argv) > 1 and sys.argv[1]!='create' and len(sys.argv) != 4) or
-      (len(sys.argv) > 1 and sys.argv[1]=='create' and len(sys.argv)!=6)):
-      usage()
+  if len(sys.argv) < 2: usage()
 
   sk = getkey(datadir)
   salt = getsalt(datadir)
   serverkey = getserverkey(datadir)
-  id = pysodium.crypto_generichash(''.join((sys.argv[2],sys.argv[3])), salt, 32)
-  hostid = pysodium.crypto_generichash(sys.argv[3], salt, 32)
+  if sys.argv[1] in ('create','get','change','delete'):
+    id = pysodium.crypto_generichash(b''.join((sys.argv[2].encode(),sys.argv[3].encode())), salt, 32)
+    hostid = pysodium.crypto_generichash(sys.argv[3], salt, 32)
+  elif sys.argv[1] == 'list':
+    hostid = pysodium.crypto_generichash(sys.argv[2], salt, 32)
+  else:
+    usage()
   b = None
 
   if sys.argv[1] == 'create':
+    if len(sys.argv)!=6: usage()
     # needs pubkey, id, challenge, sig(id)
     # returns output from ./response | fail
     if set(sys.argv[4]) - {'u','l','s','d'}:
@@ -147,23 +168,29 @@ if __name__ == '__main__':
     except:
         print("error: size has to be integer.")
         usage()
-    saverules(datadir, hostid, sys.argv[4], size)
+    saverules(datadir, hostid, sys.argv[4], size, sys.argv[2].encode())
     b, c = challenge()
     message = [CREATE,id,c, pysodium.crypto_sign_sk_to_pk(sk)]
   elif sys.argv[1] == 'get':
+    if len(sys.argv) != 4: usage()
     # needs id, challenge, sig(id)
     b, c = challenge()
     message = [GET,id,c]
     # returns output from ./response | fail
   elif sys.argv[1] == 'change':
+    if len(sys.argv) != 4: usage()
     # needs id, challenge, sig(id)
     b, c = challenge()
     message = [CHANGE,id,c]
     # changes stored secret
     # returns output from ./response | fail
   elif sys.argv[1] == 'delete':
+    if len(sys.argv) != 4: usage()
     # needs id, sig(id)
     message = [DELETE,id]
+  elif sys.argv[1] == 'list':
+    print(b'\n'.join(getusers(datadir, hostid)).decode())
+    sys.exit(0)
   else:
     usage()
 
