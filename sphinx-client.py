@@ -41,7 +41,7 @@ class SphinxClientProtocol(asyncio.Protocol):
 
     rwd=sphinx.finish(self.b, data)
 
-    rule = getrule(datadir, id)
+    rule = getrule(datadir, hostid)
     if not rule:
         print("no password rule defined for this password.")
     rule, size = rule
@@ -97,8 +97,8 @@ def saverules(datadir, id, rules, size):
 def getrule(datadir, id):
   datadir = os.path.expanduser(datadir+'/rules/')
   try:
-    fd = open(datadir+binascii.hexlify(id).decode(), 'rb')
-    rule = struct.unpack(">H",fd.read(2))[0]
+    with open(datadir+binascii.hexlify(id).decode(), 'rb') as fd:
+        rule = struct.unpack(">H",fd.read(2))[0]
     size = (rule & 0x7f)
     rule = {c for i,c in enumerate(('u','l','s','d')) if (rule >> 7) & (1 << i)}
     return (rule, size)
@@ -133,6 +133,7 @@ if __name__ == '__main__':
   salt = getsalt(datadir)
   serverkey = getserverkey(datadir)
   id = pysodium.crypto_generichash(''.join((sys.argv[2],sys.argv[3])), salt, 32)
+  hostid = pysodium.crypto_generichash(sys.argv[3], salt, 32)
   b = None
 
   if sys.argv[1] == 'create':
@@ -146,7 +147,7 @@ if __name__ == '__main__':
     except:
         print("error: size has to be integer.")
         usage()
-    saverules(datadir, id, sys.argv[4], size)
+    saverules(datadir, hostid, sys.argv[4], size)
     b, c = challenge()
     message = [CREATE,id,c, pysodium.crypto_sign_sk_to_pk(sk)]
   elif sys.argv[1] == 'get':
