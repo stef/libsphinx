@@ -14,10 +14,12 @@ CHANGE=b'\xaa'
 DELETE=b'\xff'
 
 class SphinxClientProtocol(asyncio.Protocol):
-  def __init__(self, message, loop,b):
+  def __init__(self, message, loop,b,handler,cb):
     self.b = b
     self.message = message
     self.loop = loop
+    self.handler = handler
+    self.cb = cb
 
   def connection_made(self, transport):
     transport.write(self.message)
@@ -27,25 +29,24 @@ class SphinxClientProtocol(asyncio.Protocol):
     if verbose: print('Data received: {!r}'.format(data.decode()))
 
     try:
-      data = pysodium.crypto_sign_open(data, serverkey)
+      data = pysodium.crypto_sign_open(data, handler.getserverkey())
     except ValueError:
-      print('invalid signature.\nabort')
-      return
+      raise ValueError('invalid signature.\nabort')
 
     if data == b'fail':
-        print('fail')
-        return
+        raise ValueError('fail')
 
     if not self.b:
-        return
+      self.cb()
+      return
 
     rwd=sphinx.finish(self.b, data)
 
-    rule = getrule(datadir, hostid)
+    rule = handler.getrule()
     if not rule:
-        print("no password rule defined for this password.")
+        raise ValueError("no password rule defined for this password.")
     rule, size = rule
-    print(bin2pass.derive(rwd,rule,size).decode())
+    self.cb(bin2pass.derive(rwd,rule,size).decode())
 
   def connection_lost(self, exc):
     if verbose:
@@ -53,151 +54,197 @@ class SphinxClientProtocol(asyncio.Protocol):
         print('Stop the event loop')
     self.loop.stop()
 
-def getkey(datadir):
-  datadir = os.path.expanduser(datadir)
-  try:
-    fd = open(datadir+'key', 'rb')
-    key = fd.read()
-    fd.close()
-    return key
-  except FileNotFoundError:
-    if not os.path.exists(datadir):
-      os.mkdir(datadir,0o700)
-    pk, sk = pysodium.crypto_sign_keypair()
-    with open(datadir+'key','wb') as fd:
-      os.fchmod(fd.fileno(),0o600)
-      fd.write(sk)
-    return sk
+class SphinxHandler():
+  def __init__(self, datadir):
+    self.datadir=datadir
 
-def getsalt(datadir):
-  datadir = os.path.expanduser(datadir)
-  try:
-    fd = open(datadir+'salt', 'rb')
-    salt = fd.read()
-    fd.close()
-    return salt
-  except FileNotFoundError:
-    salt = pysodium.randombytes(32)
-    with open(datadir+'salt','wb') as fd:
-      os.fchmod(fd.fileno(),0o600)
-      fd.write(salt)
-    return salt
-
-def saverules(datadir, id, rules, size, user):
-  datadir = os.path.expanduser(datadir+'/rules/')
-  if not os.path.exists(datadir):
-      os.mkdir(datadir,0o700)
-  # convert rule to bitfields
-  rules = sum(1<<i for i, c in enumerate(('u','l','s','d')) if c in rules)
-  # pack rule
-  rule=(rules << 7) | (size & 0x7f)
-  fname = datadir+binascii.hexlify(id).decode()
-  if not os.path.exists(fname):
-    with open(fname, 'wb') as fd:
-        fd.write(struct.pack('>H', rule))
-        fd.write(user)
-  else:
-    with open(fname, 'ab') as fd:
-        fd.write(b"\n"+user)
-
-def getusers(datadir, id):
-  datadir = os.path.expanduser(datadir+'/rules/')
-  try:
-    with open(datadir+binascii.hexlify(id).decode(), 'rb') as fd:
-      # skip rules
-      fd.seek(2)
-      return [x.strip() for x in fd.readlines()]
-  except FileNotFoundError:
-      return None
-
-def getrule(datadir, id):
-  datadir = os.path.expanduser(datadir+'/rules/')
-  try:
-    with open(datadir+binascii.hexlify(id).decode(), 'rb') as fd:
-        rule = struct.unpack(">H",fd.read(2))[0]
-    size = (rule & 0x7f)
-    rule = {c for i,c in enumerate(('u','l','s','d')) if (rule >> 7) & (1 << i)}
-    return (rule, size)
-  except FileNotFoundError:
-      return None
-
-def getserverkey(datadir):
-  datadir = os.path.expanduser(datadir)
-  try:
-    with open(datadir+'server-key.pub', 'rb') as fd:
+  def getkey(self):
+    datadir = os.path.expanduser(self.datadir)
+    try:
+      fd = open(datadir+'key', 'rb')
       key = fd.read()
-    return key
-  except FileNotFoundError:
-    print("no server key found, please install it")
-    sys.exit(1)
+      fd.close()
+      return key
+    except FileNotFoundError:
+      if not os.path.exists(datadir):
+        os.mkdir(datadir,0o700)
+      pk, sk = pysodium.crypto_sign_keypair()
+      with open(datadir+'key','wb') as fd:
+        os.fchmod(fd.fileno(),0o600)
+        fd.write(sk)
+      return sk
 
-def usage():
-  print("usage: %s create <user> <site> [u][l][d][s] [<size>]" % sys.argv[0])
-  print("usage: %s <get|change|delete> <user> <site>" % sys.argv[0])
-  print("usage: %s list <site>" % sys.argv[0])
-  sys.exit(1)
+  def getsalt(self):
+    datadir = os.path.expanduser(self.datadir)
+    try:
+      fd = open(datadir+'salt', 'rb')
+      salt = fd.read()
+      fd.close()
+      return salt
+    except FileNotFoundError:
+      salt = pysodium.randombytes(32)
+      with open(datadir+'salt','wb') as fd:
+        os.fchmod(fd.fileno(),0o600)
+        fd.write(salt)
+      return salt
 
-def challenge():
-  pwd = sys.stdin.buffer.read()
-  return sphinx.challenge(pwd)
+  def saverules(self, id, rules, size, user):
+    datadir = os.path.expanduser(self.datadir+'/rules/')
+    if not os.path.exists(datadir):
+        os.mkdir(datadir,0o700)
+    # convert rule to bitfields
+    rules = sum(1<<i for i, c in enumerate(('u','l','s','d')) if c in rules)
+    # pack rule
+    rule=(rules << 7) | (size & 0x7f)
+    fname = datadir+binascii.hexlify(id).decode()
+    if not os.path.exists(fname):
+      with open(fname, 'wb') as fd:
+          fd.write(struct.pack('>H', rule))
+          fd.write(user)
+    else:
+      with open(fname, 'ab') as fd:
+          fd.write(b"\n"+user)
+
+  def getusers(self, id):
+    datadir = os.path.expanduser(self.datadir+'/rules/')
+    try:
+      with open(datadir+binascii.hexlify(id).decode(), 'rb') as fd:
+        # skip rules
+        fd.seek(2)
+        return [x.strip() for x in fd.readlines()]
+    except FileNotFoundError:
+        return None
+
+  def deluser(self, id, user):
+    datadir = os.path.expanduser(self.datadir+'/rules/')
+    try:
+      with open(datadir+binascii.hexlify(id).decode(), 'rb') as fd:
+        # skip rules
+        rules = fd.read(2)
+        users=[x.strip() for x in fd.readlines() if x.strip() != user.encode()]
+      with open(datadir+binascii.hexlify(id).decode(), 'wb') as fd:
+        # skip rules
+        fd.write(rules)
+        fd.write(b'\n'.join(users))
+    except FileNotFoundError:
+      raise
+      return None
+
+  def getrule(self):
+    datadir = os.path.expanduser(self.datadir+'/rules/')
+    try:
+      with open(datadir+binascii.hexlify(self.hostid).decode(), 'rb') as fd:
+          rule = struct.unpack(">H",fd.read(2))[0]
+      size = (rule & 0x7f)
+      rule = {c for i,c in enumerate(('u','l','s','d')) if (rule >> 7) & (1 << i)}
+      return (rule, size)
+    except FileNotFoundError:
+        return None
+
+  def getserverkey(self):
+    datadir = os.path.expanduser(self.datadir)
+    try:
+      with open(datadir+'server-key.pub', 'rb') as fd:
+        key = fd.read()
+      return key
+    except FileNotFoundError:
+      print("no server key found, please install it")
+      sys.exit(1)
+
+  def getid(self, host, user):
+    salt = self.getsalt()
+    return pysodium.crypto_generichash(b''.join((user.encode(),host.encode())), salt, 32)
+
+  def doSphinx(self, message, host, b, cb):
+    self.hostid=pysodium.crypto_generichash(host, self.getsalt(), 32)
+    signed=pysodium.crypto_sign(message,self.getkey())
+    loop = asyncio.get_event_loop()
+    coro = loop.create_connection(lambda: SphinxClientProtocol(signed, loop, b, self, cb), addr, port)
+    loop.run_until_complete(coro)
+    loop.run_forever()
+    loop.close()
+
+  def create(self, cb, pwd, user, host, char_classes, size=0):
+    if set(char_classes) - {'u','l','s','d'}:
+        raise ValueError("error: rules can only contain ulsd.")
+    try: size=int(size)
+    except:
+        raise ValueError("error: size has to be integer.")
+
+    salt = self.getsalt()
+    hostid = pysodium.crypto_generichash(host, salt, 32)
+    self.saverules(hostid, char_classes, size, user.encode())
+
+    b, c = sphinx.challenge(pwd)
+    sk = self.getkey()
+    message = b''.join([CREATE,
+                        self.getid(host, user),
+                        c,
+                        pysodium.crypto_sign_sk_to_pk(sk)])
+    self.doSphinx(message, host, b, cb)
+
+  def get(self, cb, pwd, user, host):
+    b, c = sphinx.challenge(pwd)
+    message = b''.join([GET,
+                        self.getid(host, user),
+                        c])
+    self.doSphinx(message, host, b, cb)
+
+  def change(self, cb, pwd, user, host):
+    b, c = sphinx.challenge(pwd)
+    print(self.getid(host, user),)
+    message = b''.join([CHANGE,
+                        self.getid(host, user),
+                        c])
+    self.doSphinx(message, host, b, cb)
+
+  def delete(self, user, host):
+    message = b''.join([DELETE,self.getid(host, user)])
+    salt = self.getsalt()
+    hostid = pysodium.crypto_generichash(sys.argv[3], salt, 32)
+    def callback():
+      handler.deluser(hostid,user)
+    self.doSphinx(message, host, None, callback)
+
+  def list(self, host):
+    salt = self.getsalt()
+    hostid = pysodium.crypto_generichash(host, salt, 32)
+    return self.getusers(hostid)
 
 if __name__ == '__main__':
+  def usage():
+    print("usage: %s create <user> <site> [u][l][d][s] [<size>]" % sys.argv[0])
+    print("usage: %s <get|change|delete> <user> <site>" % sys.argv[0])
+    print("usage: %s list <site>" % sys.argv[0])
+    sys.exit(1)
+
   if len(sys.argv) < 2: usage()
 
-  sk = getkey(datadir)
-  salt = getsalt(datadir)
-  serverkey = getserverkey(datadir)
-  if sys.argv[1] in ('create','get','change','delete'):
-    id = pysodium.crypto_generichash(b''.join((sys.argv[2].encode(),sys.argv[3].encode())), salt, 32)
-    hostid = pysodium.crypto_generichash(sys.argv[3], salt, 32)
-  elif sys.argv[1] == 'list':
-    hostid = pysodium.crypto_generichash(sys.argv[2], salt, 32)
-  else:
-    usage()
-  b = None
+  handler = SphinxHandler(datadir)
 
   if sys.argv[1] == 'create':
-    if len(sys.argv)!=6: usage()
-    # needs pubkey, id, challenge, sig(id)
-    # returns output from ./response | fail
-    if set(sys.argv[4]) - {'u','l','s','d'}:
-        print("error: rules can only contain ulsd.")
-        usage()
-    size = 0
-    try: size=int(sys.argv[5])
-    except:
-        print("error: size has to be integer.")
-        usage()
-    saverules(datadir, hostid, sys.argv[4], size, sys.argv[2].encode())
-    b, c = challenge()
-    message = [CREATE,id,c, pysodium.crypto_sign_sk_to_pk(sk)]
+    if len(sys.argv) not in (5,6): usage()
+    pwd = sys.stdin.buffer.read()
+    if len(sys.argv) == 6:
+      size=sys.argv[5]
+    else:
+      size = 0
+    handler.create(print, pwd, sys.argv[2], sys.argv[3], sys.argv[4], size)
   elif sys.argv[1] == 'get':
     if len(sys.argv) != 4: usage()
     # needs id, challenge, sig(id)
-    b, c = challenge()
-    message = [GET,id,c]
-    # returns output from ./response | fail
+    pwd = sys.stdin.buffer.read()
+    handler.get(print, pwd, sys.argv[2], sys.argv[3])
   elif sys.argv[1] == 'change':
     if len(sys.argv) != 4: usage()
     # needs id, challenge, sig(id)
-    b, c = challenge()
-    message = [CHANGE,id,c]
-    # changes stored secret
-    # returns output from ./response | fail
+    pwd = sys.stdin.buffer.read()
+    handler.change(print, pwd, sys.argv[2], sys.argv[3])
   elif sys.argv[1] == 'delete':
     if len(sys.argv) != 4: usage()
-    # needs id, sig(id)
-    message = [DELETE,id]
+    handler.delete(sys.argv[2], sys.argv[3])
   elif sys.argv[1] == 'list':
-    print(b'\n'.join(getusers(datadir, hostid)).decode())
-    sys.exit(0)
+    if len(sys.argv) != 3: usage()
+    print(b'\n'.join(handler.list(sys.argv[2])).decode())
   else:
     usage()
-
-  message=pysodium.crypto_sign(b''.join(message),sk)
-
-  loop = asyncio.get_event_loop()
-  coro = loop.create_connection(lambda: SphinxClientProtocol(message, loop, b), addr, port)
-  loop.run_until_complete(coro)
-  loop.run_forever()
-  loop.close()
