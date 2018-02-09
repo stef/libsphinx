@@ -24,11 +24,13 @@ def respond(chal, id):
     secret = fd.read()
 
   if len(secret)!= sphinx.DECAF_255_SCALAR_BYTES:
+    if verbose: print("secret wrong size")
     return b'fail'
 
   try:
     return sphinx.respond(chal, secret)
   except ValueError:
+    if verbose: print("respond fail")
     return b'fail'
 
 class SphinxOracleProtocol(asyncio.Protocol):
