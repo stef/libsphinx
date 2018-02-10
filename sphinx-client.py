@@ -209,7 +209,7 @@ class SphinxHandler():
   def list(self, host):
     salt = self.getsalt()
     hostid = pysodium.crypto_generichash(host, salt, 32)
-    return self.getusers(hostid)
+    return self.getusers(hostid) or []
 
 if __name__ == '__main__':
   def usage():
