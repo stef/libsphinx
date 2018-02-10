@@ -122,12 +122,14 @@ class SphinxHandler():
         # skip rules
         rules = fd.read(2)
         users=[x.strip() for x in fd.readlines() if x.strip() != user.encode()]
-      with open(datadir+binascii.hexlify(id).decode(), 'wb') as fd:
-        # skip rules
-        fd.write(rules)
-        fd.write(b'\n'.join(users))
+      if users != []:
+        with open(datadir+binascii.hexlify(id).decode(), 'wb') as fd:
+            # skip rules
+            fd.write(rules)
+            fd.write(b'\n'.join(users))
+      else:
+        os.unlink(datadir+binascii.hexlify(id).decode())
     except FileNotFoundError:
-      raise
       return None
 
   def getrule(self):
