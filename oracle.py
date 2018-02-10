@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import asyncio, datetime, pysodium, os, binascii, shutil, sphinx, sys
+import asyncio, datetime, pysodium, os, binascii, shutil, sphinxlib, sys
 
 verbose = False
 address = '127.0.0.1'
@@ -23,12 +23,12 @@ def respond(chal, id):
   with open(keyf,'rb') as fd:
     secret = fd.read()
 
-  if len(secret)!= sphinx.DECAF_255_SCALAR_BYTES:
+  if len(secret)!= sphinxlib.DECAF_255_SCALAR_BYTES:
     if verbose: print("secret wrong size")
     return b'fail'
 
   try:
-    return sphinx.respond(chal, secret)
+    return sphinxlib.respond(chal, secret)
   except ValueError:
     if verbose: print("respond fail")
     return b'fail'
