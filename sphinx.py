@@ -164,7 +164,6 @@ class SphinxHandler():
     coro = loop.create_connection(lambda: SphinxClientProtocol(signed, loop, b, self, cb), addr, port)
     loop.run_until_complete(coro)
     loop.run_forever()
-    loop.close()
 
   def create(self, cb, pwd, user, host, char_classes, size=0):
     if set(char_classes) - {'u','l','s','d'}:
