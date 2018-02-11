@@ -29,7 +29,7 @@ class SphinxClientProtocol(asyncio.Protocol):
     if verbose: print('Data received: {!r}'.format(data.decode()))
 
     try:
-      data = pysodium.crypto_sign_open(data, handler.getserverkey())
+      data = pysodium.crypto_sign_open(data, self.handler.getserverkey())
     except ValueError:
       raise ValueError('invalid signature.\nabort')
 
@@ -42,7 +42,7 @@ class SphinxClientProtocol(asyncio.Protocol):
 
     rwd=sphinxlib.finish(self.b, data)
 
-    rule = handler.getrule()
+    rule = self.handler.getrule()
     if not rule:
         raise ValueError("no password rule defined for this password.")
     rule, size = rule
