@@ -1,0 +1,10 @@
+// put into ~/.mozilla/native-messaging-hosts/websphinx.json or equivalent.
+{
+  "name": "websphinx",
+  "description": "Host for communicating with PITCHFORKed Sphinx",
+  "path": "/home/s/tasks/pitchfork/src/ramload/sphinx/host/websphinx.py",
+  "type": "stdio",
+  "allowed_extensions": [
+    "sphinx@ctrlc.hu"
+  ]
+}

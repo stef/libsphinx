@@ -1,0 +1,50 @@
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-width: 280px;
+}
+
+#search {
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  box-sizing: border-box;
+}
+
+#search:focus {
+  outline: 0;
+}
+
+#results {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+#results:empty {
+  display: none;
+}
+
+#results button {
+  width: 100%;
+  background-color: #fff;
+  border: 0;
+  box-shadow: none;
+  text-align: left;
+  padding: 10px;
+}
+
+#results button:hover, #results button:focus, #results .focus button {
+  outline: 0;
+  background-color: #eee;
+}
+
+#results img {
+  margin-right: 10px;
+  vertical-align: middle;
+  width: 16px;
+  height: 16px;
+}

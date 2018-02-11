@@ -1,0 +1,8 @@
+{
+  "extDescription": {
+    "message": "Web extension for PITCHFORKed Sphinx"
+  },
+  "searchPlaceholder": {
+    "message": "Search password..."
+  }
+}
