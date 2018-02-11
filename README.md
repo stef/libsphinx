@@ -156,9 +156,9 @@ function return 1, otherwise 0.
 
 ## Python wrapper
 
-Pitchforked sphinx also comes with a python wrapper, so you can build
-whatever you fancy immediately in python. The interface exposed wraps
-the 3 sphinx functions from the library like this:
+Pitchforked sphinx also comes with a python wrapper `sphinxlib`, so
+you can build whatever you fancy immediately in python. The interface
+exposed wraps the 3 sphinx functions from the library like this:
 
 ```
 def challenge(pwd)
@@ -206,7 +206,7 @@ can be done simply by:
 ./oracle.py
 ```
 
-### sphinx-client
+### sphinx - the client
 
 This is the client that connects to the oracle to manage passwords
 using the sphinx protocol.
@@ -246,7 +246,7 @@ password on standard input to the client, and provide parameters like
 in this example:
 
 ```
-echo 'my master password' | ./sphinx-client.py create username https://example.com ulsd 0
+echo 'my master password' | ./sphinx.py create username https://example.com ulsd 0
 ```
 
 The parameters to the client are `create` for the operation, then
@@ -265,7 +265,7 @@ Getting a password from the sphinx oracle works by running the
 following command:
 
 ```
-echo 'my master password' | ./sphinx-client.py get username https://example.com
+echo 'my master password' | ./sphinx.py get username https://example.com
 ```
 
 Here again you supply your master password on standard input, provide
@@ -280,7 +280,7 @@ is easy while you can keep your master password the unchanged (or you
 can change it too, if you want). The command is this:
 
 ```
-echo 'my master password' | ./sphinx-client.py change username https://example.com
+echo 'my master password' | ./sphinx.py change username https://example.com
 ```
 
 Here again you supply your master password on standard input. This
@@ -296,7 +296,7 @@ In case you want to delete a password, you can do using the following
 command:
 
 ```
-./sphinx-client.py delete username https://example.com
+./sphinx.py delete username https://example.com
 ```
 
 You provide the `delete` operation as the first parameter to the
