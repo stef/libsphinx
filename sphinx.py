@@ -10,6 +10,7 @@ datadir = '~/.sphinx/'
 
 CREATE=b'\x00'
 GET=b'\x66'
+COMMIT=b'\x99'
 CHANGE=b'\xaa'
 DELETE=b'\xff'
 
@@ -198,10 +199,18 @@ class SphinxHandler():
                         c])
     self.doSphinx(message, host, b, cb)
 
+  def commit(self, user, host):
+    message = b''.join([COMMIT,self.getid(host, user)])
+    salt = self.getsalt()
+    hostid = pysodium.crypto_generichash(host, salt, 32)
+    def callback():
+      return
+    self.doSphinx(message, host, None, callback)
+
   def delete(self, user, host):
     message = b''.join([DELETE,self.getid(host, user)])
     salt = self.getsalt()
-    hostid = pysodium.crypto_generichash(sys.argv[3], salt, 32)
+    hostid = pysodium.crypto_generichash(host, salt, 32)
     def callback():
       handler.deluser(hostid,user)
     self.doSphinx(message, host, None, callback)
@@ -214,7 +223,7 @@ class SphinxHandler():
 if __name__ == '__main__':
   def usage():
     print("usage: %s create <user> <site> [u][l][d][s] [<size>]" % sys.argv[0])
-    print("usage: %s <get|change|delete> <user> <site>" % sys.argv[0])
+    print("usage: %s <get|change|commit|delete> <user> <site>" % sys.argv[0])
     print("usage: %s list <site>" % sys.argv[0])
     sys.exit(1)
 
@@ -240,6 +249,9 @@ if __name__ == '__main__':
     # needs id, challenge, sig(id)
     pwd = sys.stdin.buffer.read()
     handler.change(print, pwd, sys.argv[2], sys.argv[3])
+  elif sys.argv[1] == 'commit':
+    if len(sys.argv) != 4: usage()
+    handler.commit(sys.argv[2], sys.argv[3])
   elif sys.argv[1] == 'delete':
     if len(sys.argv) != 4: usage()
     handler.delete(sys.argv[2], sys.argv[3])

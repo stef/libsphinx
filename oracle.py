@@ -11,6 +11,7 @@ key = None
 
 CREATE=0x00
 GET=0x66
+COMMIT=0x99
 CHANGE=0xaa
 DELETE=0xff
 
@@ -110,11 +111,46 @@ class SphinxOracleProtocol(asyncio.Protocol):
 
     tdir = datadir+binascii.hexlify(id).decode()
     key=pysodium.randombytes(32)
+    with open(tdir+'/new','wb') as fd:
+      os.fchmod(fd.fileno(),0o600)
+      fd.write(key)
+
+    try:
+      return sphinxlib.respond(chal, key)
+    except ValueError:
+      if verbose: print("respond fail")
+      return b'fail'
+
+  def commit(self, data):
+    # needs id, sig(id)
+    try:
+      pk = self.getpk(data)
+    except:
+      return b'fail'
+    try:
+      data = pysodium.crypto_sign_open(data, pk)
+    except ValueError:
+      print('invalid signature')
+      return b'fail'
+    id = data[1:33]
+    tdir = datadir+binascii.hexlify(id).decode()
+
+    try:
+      with open(tdir+'/new','rb') as fd:
+        key = fd.read()
+    except FileNotFoundError:
+      return b'fail'
+
+    os.unlink(tdir+'/new')
+
+    if(len(key)!=32):
+      return b'fail'
+
     with open(tdir+'/key','wb') as fd:
       os.fchmod(fd.fileno(),0o600)
       fd.write(key)
 
-    return respond(chal, id)
+    return b'ok'
 
   def delete(self, data):
     # needs id, sig(id)
@@ -155,6 +191,10 @@ class SphinxOracleProtocol(asyncio.Protocol):
       # needs id, sig(id)
       # returns ok|fail
       res = self.delete(data)
+    elif data[64] == COMMIT:
+      # needs id, sig(id)
+      # returns ok|fail
+      res = self.commit(data)
 
     if verbose:
       print('Send: {!r}'.format(res))
