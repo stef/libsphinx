@@ -199,7 +199,7 @@ class SphinxHandler():
                         c])
     self.doSphinx(message, host, b, cb)
 
-  def commit(self, user, host):
+  def commit(self, cb, user, host):
     message = b''.join([COMMIT,self.getid(host, user)])
     salt = self.getsalt()
     hostid = pysodium.crypto_generichash(host, salt, 32)
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     handler.change(print, pwd, sys.argv[2], sys.argv[3])
   elif sys.argv[1] == 'commit':
     if len(sys.argv) != 4: usage()
-    handler.commit(sys.argv[2], sys.argv[3])
+    handler.commit(print, sys.argv[2], sys.argv[3])
   elif sys.argv[1] == 'delete':
     if len(sys.argv) != 4: usage()
     handler.delete(sys.argv[2], sys.argv[3])
