@@ -44,28 +44,42 @@ def send_message(data):
   sys.stdout.buffer.flush()
 
 def users(data):
-  #log.write(repr(data).encode())
-  #log.write(b'\n')
   handler = SphinxHandler(datadir)
   res = {'names': [i.decode() for i in handler.list(data['site'])],
          'cmd': 'list',
          'site': data['site']}
-  #log.write(repr(res).encode())
-  #log.write(b'\n')
   send_message({ 'results': res })
 
 def get(data):
-  #log.write(repr(data).encode())
-  #log.write(b'\n')
-  #send_message({ 'password': "w L')qX_QLwD\\%^A2]y!Hbo4>xYU*]M</VM3u?uA", 'name': data['name'], 'site': data['site']})
   handler = SphinxHandler(datadir)
   pwd=getpwd()
   def callback(arg):
     res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'show'}
     send_message({ 'results': res })
-    #log.write(repr(res).encode())
-    #log.write(b'\n')
   handler.get(callback, pwd, data['name'], data['site'])
+
+def create(data):
+  handler = SphinxHandler(datadir)
+  pwd=getpwd()
+  def callback(arg):
+    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'create'}
+    send_message({ 'results': res })
+  handler.create(callback, pwd, data['name'], data['site'], data['rules'], data['size'])
+
+def change(data):
+  handler = SphinxHandler(datadir)
+  pwd=getpwd()
+  def callback(arg):
+    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'change'}
+    send_message({ 'results': res })
+  handler.change(callback, pwd, data['name'], data['site'])
+
+def commit(data):
+  handler = SphinxHandler(datadir)
+  def callback(arg):
+    res = { 'result': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'commit'}
+    send_message({ 'results': res })
+  handler.commit(callback, data['name'], data['site'])
 
 def main():
   while True:
@@ -81,7 +95,12 @@ def main():
       get(data)
     elif data['cmd'] == 'list':
       users(data)
+    elif data['cmd'] == 'create':
+      create(data)
+    elif data['cmd'] == 'change':
+      change(data)
+    elif data['cmd'] == 'commit':
+      commit(data)
 
 if __name__ == '__main__':
-  #log = open('/tmp/websphinx.log','a+b')
   main()

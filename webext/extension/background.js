@@ -24,6 +24,7 @@ const APP_NAME = "websphinx";
 var browser = browser || chrome;
 var portFromCS;
 var nativeport = browser.runtime.connectNative(APP_NAME);
+var changeData = true;
 
 nativeport.onMessage.addListener((response) => {
   if (browser.runtime.lastError) {
@@ -31,15 +32,35 @@ nativeport.onMessage.addListener((response) => {
     console.error(error);
     portFromCS.postMessage({ status: "ERROR", error: error });
   } else if(response.results.cmd == 'show') {
-    browser.tabs.executeScript({ file: '/inject.js', allFrames: true }, function() {
-      let login = {
-        username: response.results.name,
-        password: response.results.password
-      };
-      browser.tabs.executeScript({code: 'document.websphinx.login(' + JSON.stringify(login) + ');'});
-    });
+    if(changeData==true) {
+      // we got the old password
+      changeData=response.results;
+      // now change the password
+      nativeport.postMessage({
+        cmd: "change",
+        site: response.results.site,
+        name: response.results.name
+      });
+      return;
+    }
+    let login = {
+      username: response.results.name,
+      password: response.results.password
+    };
+    browser.tabs.executeScript({code: 'document.websphinx.login(' + JSON.stringify(login) + ');'});
   } else if(response.results.cmd == 'list') {
-      portFromCS.postMessage(response);
+    portFromCS.postMessage(response);
+  } else if(response.results.cmd == 'create') {
+    browser.tabs.executeScript({code: 'document.websphinx.create(' + JSON.stringify(response.results.password) + ');'});
+  } else if(response.results.cmd == 'change') {
+    let change = {
+      'old': changeData,
+      'new': response.results
+    }
+    browser.tabs.executeScript({code: 'document.websphinx.change(' + JSON.stringify(change) + ');'});
+    changeData = false;
+  } else if(response.results.cmd == 'commit') {
+    portFromCS.postMessage(response);
   }
 });
 
@@ -49,14 +70,38 @@ browser.runtime.onConnect.addListener(function(p) {
   // proxy from CS to native backend
   portFromCS.onMessage.addListener(function(request, sender, sendResponse) {
     if (request.action == "login") {
+      changeData=false;
       nativeport.postMessage({
         cmd: "show",
         site: request.site,
         name: request.name});
     } else if (request.action == "list") {
       nativeport.postMessage({
-        cmd: "list",
+        cmd: request.action,
         site: request.site});
+    } else if (request.action == "create") {
+      nativeport.postMessage({
+        cmd: request.action,
+        site: request.site,
+        name: request.name,
+        rules: request.rules,
+        size: request.size
+      });
+    } else if (request.action == "change") {
+      // first get old password
+      // but this will trigger the login inject in the nativport onmessage cb
+      changeData = true;
+      nativeport.postMessage({
+        cmd: "show",
+        site: request.site,
+        name: request.name
+      });
+    } else if (request.action == "commit") {
+      nativeport.postMessage({
+        cmd: request.action,
+        site: request.site,
+        name: request.name
+      });
     }
   });
 });

@@ -2,6 +2,9 @@
   "extDescription": {
     "message": "Web extension for PITCHFORKed Sphinx"
   },
+  "sizePlaceholder": {
+    "message": "size of password..."
+  },
   "searchPlaceholder": {
     "message": "Search password..."
   }
