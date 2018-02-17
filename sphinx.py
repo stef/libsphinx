@@ -163,15 +163,20 @@ class SphinxHandler():
     signed=pysodium.crypto_sign(message,self.getkey())
     loop = asyncio.get_event_loop()
     coro = loop.create_connection(lambda: SphinxClientProtocol(signed, loop, b, self, cb), addr, port)
-    loop.run_until_complete(coro)
-    loop.run_forever()
+    try:
+      loop.run_until_complete(coro)
+      loop.run_forever()
+    except:
+      raise
 
   def create(self, cb, pwd, user, host, char_classes, size=0):
     if set(char_classes) - {'u','l','s','d'}:
-        raise ValueError("error: rules can only contain ulsd.")
+      raise ValueError("error: rules can only contain ulsd.")
     try: size=int(size)
     except:
-        raise ValueError("error: size has to be integer.")
+      raise ValueError("error: size has to be integer.")
+    if user.encode() in self.list(host):
+      raise ValueError("error: User already exists.")
 
     salt = self.getsalt()
     hostid = pysodium.crypto_generichash(host, salt, 32)
