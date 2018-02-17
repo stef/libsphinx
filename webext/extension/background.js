@@ -31,6 +31,8 @@ nativeport.onMessage.addListener((response) => {
     var error = browser.runtime.lastError.message;
     console.error(error);
     portFromCS.postMessage({ status: "ERROR", error: error });
+  } else if(response.results == 'fail') {
+    console.log('websphinx failed');
   } else if(response.results.cmd == 'show') {
     if(changeData==true) {
       // we got the old password
@@ -51,7 +53,11 @@ nativeport.onMessage.addListener((response) => {
   } else if(response.results.cmd == 'list') {
     portFromCS.postMessage(response);
   } else if(response.results.cmd == 'create') {
-    browser.tabs.executeScript({code: 'document.websphinx.create(' + JSON.stringify(response.results.password) + ');'});
+    let account = {
+      username: response.results.name,
+      password: response.results.password
+    };
+    browser.tabs.executeScript({code: 'document.websphinx.create(' + JSON.stringify(account) + ');'});
   } else if(response.results.cmd == 'change') {
     let change = {
       'old': changeData,
