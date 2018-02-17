@@ -3,9 +3,9 @@
     "message": "Web extension for PITCHFORKed Sphinx"
   },
   "sizePlaceholder": {
-    "message": "size of password..."
+    "message": "Size"
   },
   "searchPlaceholder": {
-    "message": "Search password..."
+    "message": "User name "
   }
 }
