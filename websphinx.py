@@ -22,9 +22,9 @@ import subprocess
 import os, sys, struct, json
 from sphinx import datadir, SphinxHandler
 
-def getpwd():
+def getpwd(title):
     proc=subprocess.Popen(['pinentry-gtk-2', '-g'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = proc.communicate(input='SETTITLE sphinx master password prompt\nSETPROMPT sphinx master password\ngetpin\n'.encode())
+    out, err = proc.communicate(input=('SETTITLE sphinx %spassword prompt\nSETPROMPT sphinx %spassword\ngetpin\n' % (title,title)).encode())
     if proc.returncode == 0:
         for line in out.split(b'\n'):
             if line.startswith(b"D "): return line[2:]
@@ -44,42 +44,58 @@ def send_message(data):
   sys.stdout.buffer.flush()
 
 def users(data):
-  handler = SphinxHandler(datadir)
-  res = {'names': [i.decode() for i in handler.list(data['site'])],
-         'cmd': 'list',
-         'site': data['site']}
-  send_message({ 'results': res })
+  try:
+    handler = SphinxHandler(datadir)
+    users = handler.list(data['site'])
+    res = {'names': [i.decode() for i in users],
+           'cmd': 'list',
+           'site': data['site']}
+    send_message({ 'results': res })
+  except:
+    send_message({ 'results': 'fail' })
 
 def get(data):
-  handler = SphinxHandler(datadir)
-  pwd=getpwd()
   def callback(arg):
     res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'show'}
     send_message({ 'results': res })
-  handler.get(callback, pwd, data['name'], data['site'])
+  try:
+    handler = SphinxHandler(datadir)
+    pwd=getpwd("current ")
+    handler.get(callback, pwd, data['name'], data['site'])
+  except:
+    send_message({ 'results': 'fail' })
 
 def create(data):
-  handler = SphinxHandler(datadir)
-  pwd=getpwd()
   def callback(arg):
     res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'create'}
     send_message({ 'results': res })
-  handler.create(callback, pwd, data['name'], data['site'], data['rules'], data['size'])
+  try:
+    handler = SphinxHandler(datadir)
+    pwd=getpwd("")
+    handler.create(callback, pwd, data['name'], data['site'], data['rules'], data['size'])
+  except:
+    send_message({ 'results': 'fail' })
 
 def change(data):
-  handler = SphinxHandler(datadir)
-  pwd=getpwd()
   def callback(arg):
     res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'change'}
     send_message({ 'results': res })
-  handler.change(callback, pwd, data['name'], data['site'])
+  try:
+    handler = SphinxHandler(datadir)
+    pwd=getpwd("new ")
+    handler.change(callback, pwd, data['name'], data['site'])
+  except:
+    send_message({ 'results': 'fail' })
 
 def commit(data):
-  handler = SphinxHandler(datadir)
   def callback(arg):
     res = { 'result': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'commit'}
     send_message({ 'results': res })
-  handler.commit(callback, data['name'], data['site'])
+  try:
+    handler = SphinxHandler(datadir)
+    handler.commit(callback, data['name'], data['site'])
+  except:
+    send_message({ 'results': 'fail' })
 
 def main():
   while True:
