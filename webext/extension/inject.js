@@ -330,8 +330,9 @@ function set_pwd(el, value) {
       }
     };
 
-    create(password) {
-      update_all(PASSWORD_FIELDS, password);
+    create(account) {
+      update(USERNAME_FIELDS, account.username);
+      update_all(PASSWORD_FIELDS, account.password);
 
       window.requestAnimationFrame(function() {
         // Try to submit the form, or focus on the submit button (based on user settings)
@@ -353,6 +354,7 @@ function set_pwd(el, value) {
       if(pwd_inputs.length!=3) {
         console.log("wtf");
         console.log(pwd_inputs);
+        return;
       }
       set_pwd(pwd_inputs[0],changed.old.password);
       set_pwd(pwd_inputs[1],changed.new.password);
