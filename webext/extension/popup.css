@@ -4,17 +4,28 @@ html, body {
 }
 
 body {
-  min-width: 280px;
+  min-width: 300px;
 }
 
-#search {
+label, input[type="checkbox"] {
+  margin-left: 10px;
+}
+
+input[type='text']#pwdlen {
+  width: auto;
+  padding: 10px;
+  border: 0;
+  box-sizing: border-box;
+}
+
+#search, input[type='text'] {
   width: 100%;
   padding: 10px;
   border: 0;
   box-sizing: border-box;
 }
 
-#search:focus {
+#search:focus, input[type='text']:focus {
   outline: 0;
 }
 
@@ -28,7 +39,33 @@ body {
   display: none;
 }
 
-#results button {
+button.selected, button#close {
+  width: auto;
+  background-color: #fff;
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+  border-top: 1px solid black;
+  box-shadow: none;
+  text-align: left;
+  padding: 10px;
+}
+
+button.inactive {
+  width: auto;
+  background-color: #aaa;
+  border: 1px solid black;
+  box-shadow: none;
+  text-align: left;
+  padding: 10px;
+}
+
+button.insert {
+  width: 100%;
+  color: blue;
+  text-align: center;
+}
+
+button {
   width: 100%;
   background-color: #fff;
   border: 0;
@@ -37,14 +74,11 @@ body {
   padding: 10px;
 }
 
-#results button:hover, #results button:focus, #results .focus button {
+button:hover, button:focus, .focus button {
   outline: 0;
   background-color: #eee;
 }
 
-#results img {
-  margin-right: 10px;
-  vertical-align: middle;
-  width: 16px;
-  height: 16px;
+.hidden {
+    display: none;
 }

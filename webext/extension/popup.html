@@ -5,7 +5,30 @@
     <script src="popup.js"></script>
   </head>
   <body>
-    <div id="ui"></div>
+    <div id='tabs'><button class="inactive" id="login_tab"><span>Login</span></button><button class="inactive" id="create_tab"><span>Create</span></button><button class="inactive" id="change_tab"><span>Change</span></button><button id="close"><span>X</span></button></div>
+    <div id="login" class="hidden">
+      <button id="login_pwd" class="insert"><span class="pwd_action">Get</span><span> password</span></button>
+    </div>
+    <div id="create" class="hidden">
+      <input type="checkbox" name="Upper" id="Upper" value="u" checked="checked" /><label for="Upper">Upper</label><br/>
+      <input type="checkbox" name="Lower" id="Lower" value="l" checked="checked" /><label for="Lower">Lower</label><br/>
+      <input type="checkbox" name="Symbols" id="Symbols" value="s" checked="checked" /><label for="Symbols">Symbols</label><br/>
+      <input type="checkbox" name="Digits" id="Digits" value="d" checked="checked" /><label for="Digits">Digits</label><br/>
+      <label for="pwdlen">Size of Password </label><input size="2" type="text" autocomplete="off" id="pwdlen" placeholder="0"><br/>
+      <button id="create_pwd" class="insert"><span class="pwd_action">Get</span><span> password</span></button>
+    </div>
+    <div id="change" class="hidden">
+      <div id="change_phase1">
+        <button id="old_pwd" class="insert"><span class="pwd_action">Get</span><span> Old password</span></button><br/>
+        <button id="new_pwd" class="insert"><span class="pwd_action">Get</span><span> New password</span></button>
+      </div>
+      <div id="change_phase2" class="hidden">
+        <button id="save_pwd" class="insert"><span>Save changed password</span></button>
+      </div>
+    </div>
+    <button id="autofill" class="insert"><span>Auto-fill</span></button>
+    <input size="16" type="text" autocomplete="off" id="search"/><br/>
+    <div id="results"></div>
   </body>
 </html>
 

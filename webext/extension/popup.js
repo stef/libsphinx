@@ -33,120 +33,119 @@ const rules = [{"title": "Upper", "value": 'u',},
 
 class Sphinx {
   constructor(ui) {
-    this.ui = ui;
     this.selectionIndex = -1;
     this.site = '';
     this.user = '';
+    this.users = [];
     this.mode = '';
     this.inputs = 0;
     this.background = browser.runtime.connect();
 
     browser.tabs.query({ currentWindow: true, active: true }, this.onTabs.bind(this));
 
+    let login_tab = document.getElementById("login_tab");
+    login_tab.addEventListener("click",this.switchTab.bind(this));
+    let create_tab = document.getElementById("create_tab");
+    create_tab.addEventListener("click",this.switchTab.bind(this));
+    let change_tab = document.getElementById("change_tab");
+    change_tab.addEventListener("click",this.switchTab.bind(this));
+
+    let closewin = document.getElementById("close");
+    closewin.addEventListener("click",this.closeWin.bind(this));
+
+    this.search = document.getElementById("search");
+    this.search.setAttribute("placeholder", browser.i18n.getMessage("searchPlaceholder"));
+    this.search.addEventListener("keydown", this.onKeyDown.bind(this));
+    this.search.addEventListener("blur", this.onBlur.bind(this));
+
     self = this;
   }
 
   userList() {
-    let input = document.createElement("input");
-    input.id="search";
-    input.autocomplete="off";
-    input.autofocus="on";
-
-    this.ui.appendChild(input);
-    input.setAttribute("placeholder", browser.i18n.getMessage("searchPlaceholder"));
-    input.addEventListener("keydown", this.onKeyDown.bind(this));
-    input.addEventListener("blur", this.onBlur.bind(this));
     setTimeout(() => {
-      input.focus();
+      this.search.focus();
     }, 100);
 
-    let ul = document.createElement("ul");
-    ul.id="results";
-    for (let result of this.users) {
-      let domain = result.split('/').reverse()[0];
+    let ul = document.getElementById("results");
+    if(ul.firstChild == null && this.users.length>0) {
+      for (let result of this.users) {
+        let domain = result.split('/').reverse()[0];
 
-      let item = document.createElement("li");
-      let button = document.createElement("button");
-      //let favicon = document.createElement("img");
-      let label = document.createElement("span");
+        let item = document.createElement("li");
+        let button = document.createElement("button");
+        //let favicon = document.createElement("img");
+        let label = document.createElement("span");
 
-      label.textContent = result;
-      button.addEventListener("click", this.onClick.bind(this));
+        label.textContent = result;
+        button.addEventListener("click", this.onClick.bind(this));
 
-      button.appendChild(label);
-      item.appendChild(button);
-      ul.appendChild(item);
+        button.appendChild(label);
+        item.appendChild(button);
+        ul.appendChild(item);
+      }
     }
-    this.ui.appendChild(ul);
+    let autofill_btn = document.getElementById("autofill");
+    autofill_btn.className = "hidden";
   }
 
   create_opts() {
-    for (let rule of rules) {
-      let item = document.createElement("li");
-      let checkbox = document.createElement("input");
-      checkbox.type="checkbox";
-      checkbox.name=rule["title"];
-      checkbox.id=rule["title"];
-      checkbox.value=rule["value"];
-      checkbox.checked="checked";
-      //let favicon = document.createElement("img");
-      let label = document.createElement("label");
-      label.for=rule["title"];
-      label.textContent = rule["title"];
-      item.appendChild(checkbox);
-      item.appendChild(label);
-      this.ui.appendChild(item);
+    this.select_tab('create');
+
+    let size_wdgt = document.getElementById("pwdlen");
+    size_wdgt.setAttribute("placeholder", browser.i18n.getMessage("sizePlaceholder"));
+    size_wdgt.addEventListener("keydown", this.onKeyDownCreate.bind(this));
+
+    if(this.user == '') {
+      setTimeout(() => {
+        this.search.focus();
+      }, 100);
+    } else {
+      this.search.value=this.user;
+      setTimeout(() => {
+        size_wdgt.focus();
+      }, 100);
     }
-    let input = document.createElement("input");
-    input.id="search";
-    input.autocomplete="off";
-    input.autofocus="on";
-    this.ui.appendChild(input);
-    input.setAttribute("placeholder", browser.i18n.getMessage("sizePlaceholder"));
-    input.addEventListener("keydown", this.onKeyDownCreate.bind(this));
-    setTimeout(() => {
-      input.focus();
-    }, 100);
-    let button = document.createElement("button");
-    let label = document.createElement("span");
-    label.textContent = "Create";
-    button.appendChild(label);
-    this.ui.appendChild(button);
-    button.addEventListener("click", this.onClickCreate.bind(this));
+    let autofill_btn = document.getElementById("autofill");
+    autofill_btn.addEventListener("click", this.onClickCreate.bind(this));
   }
 
   commit_ui() {
-    while (this.ui.firstChild)
-      this.ui.removeChild(this.ui.firstChild);
-
-    let button = document.createElement("button");
-    let label = document.createElement("span");
-    label.textContent = "Save changed password";
-    button.appendChild(label);
-    this.ui.appendChild(button);
-    button.addEventListener("click", this.onClickCommit.bind(this));
+    this.select_tab('change');
+    document.getElementById("change_phase1").className = "hidden";
+    document.getElementById("change_phase2").className = null;
+    document.getElementById('save_pwd').addEventListener("click", this.onClickCommit.bind(this));
+    document.getElementById("autofill").className = "hidden";
+    document.getElementById("results").className = "hidden";
   }
 
   decide() {
     if(this.inputs == 1) { // one password field -> probably login
       // only one user in our db - use that to auto login
+
+      // todo
+      // hide autofill button
+      // when auto-login change "get password" to "insert password" mode after password has been injected
+
+      this.mode = 'login';
+      this.select_tab('login');
+
       if(this.users.length == 1) {
         this.background.postMessage({ "action": "login", "site": this.site, "name": this.users[0] });
-        window.close();
+        //window.close();
         return;
       }
       // user set in the forms user field, auto select that user
       for(let user of this.users) {
         if(user == this.user && user != '') {
           this.background.postMessage({ "action": "login", "site": this.site, "name": user });
-          window.close();
+          //window.close();
           return;
         }
       }
       // can't decide let user select which username to use for login
-      this.mode = "login";
       this.userList();
-    } else if(this.inputs == 2) { // 2 password fields -> either create user, or login with OTP field.
+    } else if(this.inputs == 2) {
+      // 2 password fields -> either create user, or login with OTP field.
       if(this.users.length == 0) { // no users associated wit this site, should be a register form
         this.create_opts();
         return;
@@ -157,7 +156,8 @@ class Sphinx {
       for(let user of this.users) {
         if(user == this.user && user != '') {
           this.background.postMessage({ "action": "login", "site": this.site, "name": user });
-          window.close();
+          this.select_tab('login');
+          //window.close();
           return;
         }
       }
@@ -168,11 +168,14 @@ class Sphinx {
     } else if(this.inputs == 3) { // probably change password field
       if(this.users.length == 0) { // no users associated wit this site, can't be a change password form
         // todo handle this case, but how?
+        this.create_opts();
         return;
       }
+      this.select_tab('change');
       if(this.users.length == 1) { // we have only one registered user with this site, so it's easy
+        this.commit_ui();
         this.background.postMessage({ "action": "change", "site": this.site, "name": this.users[0] });
-        window.close();
+        //window.close();
         return;
       }
       // choose user to change password for
@@ -185,7 +188,7 @@ class Sphinx {
 
   recon_cb(response) {
     browser.runtime.onMessage.removeListener(self.recon_cb);
-    console.log(response);
+    //console.log(response);
     self.user = response.username;
     self.inputs = response.password_fields;
     self.decide();
@@ -193,7 +196,7 @@ class Sphinx {
 
   get_users_cb(response) {
     self.background.onMessage.removeListener(self.get_users_cb);
-    console.log(response);
+    //console.log(response);
     if(response.results) {
       self.users = response.results.names;
     }
@@ -206,8 +209,9 @@ class Sphinx {
 
   onTabs(tabs) {
     // clear user list
-    while (this.ui.firstChild)
-      this.ui.removeChild(this.ui.firstChild);
+    let results = document.getElementById("results");
+    while (results.firstChild)
+      results.removeChild(results.firstChild);
 
     if (tabs[0] && tabs[0].url) {
       this.site = new URL(tabs[0].url).hostname;
@@ -241,6 +245,10 @@ class Sphinx {
     this.background.onMessage.addListener(this.commit_cb);
     this.background.postMessage({ "action": "commit", "site": this.site, "name": this.user });
     window.close();
+  }
+
+  onClickCreate(event) {
+    this.submitCreate();
   }
 
   onClick(event) {
@@ -285,7 +293,7 @@ class Sphinx {
     }
     // get password size
     let size = 0;
-    let input = document.getElementById('search');
+    let input = document.getElementById('pwdlen');
     if(input.value != '') {
       try { size = Number(input.value) } catch (e) {
         // todo signal error
@@ -293,8 +301,18 @@ class Sphinx {
       }
     }
     if(this.user == '') {
-      // todo signal error
-      return;
+      if(this.search.value == '') {
+        this.search.style="background: red;";
+        setTimeout(() => {
+          this.search.focus();
+        }, 100);
+        setTimeout(() => {
+          this.search.style=null;
+        }, 1000);
+        return;
+      }
+      // we assume the value of the search field to be the username to be created
+      this.user = this.search.value;
     }
     this.background.postMessage({ "action": "create", "site": this.site, "name": this.user, "rules": r, "size": size });
     window.close();
@@ -307,8 +325,50 @@ class Sphinx {
     }
   }
 
-  onClickCreate(event) {
-    this.submitCreate();
+  select_tab(tabid) {
+    let tab = document.getElementById(tabid+'_tab');
+    this.switchTab({target: tab});
+  }
+
+  switchTab(event) {
+    let tabs = document.getElementById("tabs");
+    for (let selected of tabs.getElementsByClassName('selected')) {
+      selected.className="inactive";
+      selected.addEventListener("click",self.switchTab.bind(self));
+      selected = document.getElementById(selected.id.slice(0,-4));
+      selected.className="hidden";
+      let tab = selected.id.slice(0,-4);
+      // remove event listeners
+      if(tab == "create") {
+          this.search.removeEventListener("keydown", this.onKeyDownCreate);
+      } else {
+          this.search.removeEventListener("keydown", this.onKeyDown);
+          this.search.removeEventListener("blur", this.onBlur);
+      }
+    }
+    event.target.className="selected";
+    event.target.removeEventListener("click", self.switchTab);
+
+    this.mode = event.target.id.slice(0,-4);
+    let selected = document.getElementById(this.mode);
+    selected.className=null;
+    let results = document.getElementById("results");
+    if(event.target.id.slice(0,-4)=="create") {
+      results.className = "hidden";
+      this.search.addEventListener("keydown", this.onKeyDownCreate.bind(this));
+    } else {
+      results.className = null;
+      if(document.getElementById("results").firstChild == null && this.users.length>0) {
+        this.userList();
+      } else {
+        this.search.addEventListener("keydown", this.onKeyDown.bind(this));
+        this.search.addEventListener("blur", this.onBlur.bind(this));
+      }
+    }
+  }
+
+  closeWin() {
+    window.close();
   }
 }
 
