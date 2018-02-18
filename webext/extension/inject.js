@@ -374,6 +374,13 @@ function set_pwd(el, value) {
         }
       });
     };
+
+    inject(pwd) {
+      let el = document.activeElement;
+      if(el.type=="password") {
+        set_pwd(el, pwd);
+      }
+    }
   }
   doc.websphinx = new WebSphinx();
 })(document);

@@ -43,15 +43,17 @@ class Sphinx {
 
     browser.tabs.query({ currentWindow: true, active: true }, this.onTabs.bind(this));
 
-    let login_tab = document.getElementById("login_tab");
-    login_tab.addEventListener("click",this.switchTab.bind(this));
-    let create_tab = document.getElementById("create_tab");
-    create_tab.addEventListener("click",this.switchTab.bind(this));
-    let change_tab = document.getElementById("change_tab");
-    change_tab.addEventListener("click",this.switchTab.bind(this));
+    // tabs + close
+    document.getElementById("login_tab").addEventListener("click",this.switchTab.bind(this));
+    document.getElementById("create_tab").addEventListener("click",this.switchTab.bind(this));
+    document.getElementById("change_tab").addEventListener("click",this.switchTab.bind(this));
+    document.getElementById("close").addEventListener("click",this.closeWin.bind(this));
 
-    let closewin = document.getElementById("close");
-    closewin.addEventListener("click",this.closeWin.bind(this));
+    // manual get/insert buttons
+    document.getElementById("login_pwd").addEventListener("click",this.getpwd.bind(this));
+    document.getElementById("old_pwd").addEventListener("click",this.getpwd.bind(this));
+    document.getElementById("new_pwd").addEventListener("click",this.newpwd.bind(this));
+    document.getElementById("create_pwd").addEventListener("click",this.createpwd.bind(this));
 
     this.search = document.getElementById("search");
     this.search.setAttribute("placeholder", browser.i18n.getMessage("searchPlaceholder"));
@@ -124,20 +126,19 @@ class Sphinx {
 
       // todo
       // hide autofill button
-      // when auto-login change "get password" to "insert password" mode after password has been injected
 
       this.mode = 'login';
       this.select_tab('login');
 
       if(this.users.length == 1) {
-        this.background.postMessage({ "action": "login", "site": this.site, "name": this.users[0] });
+        this.background.postMessage({ "action": "login", "site": this.site, "name": this.users[0], "mode": "insert" });
         //window.close();
         return;
       }
       // user set in the forms user field, auto select that user
       for(let user of this.users) {
         if(user == this.user && user != '') {
-          this.background.postMessage({ "action": "login", "site": this.site, "name": user });
+          this.background.postMessage({ "action": "login", "site": this.site, "name": user, "mode": "insert" });
           //window.close();
           return;
         }
@@ -155,14 +156,13 @@ class Sphinx {
       // login form
       for(let user of this.users) {
         if(user == this.user && user != '') {
-          this.background.postMessage({ "action": "login", "site": this.site, "name": user });
+          this.background.postMessage({ "action": "login", "site": this.site, "name": user, "mode": "insert" });
           this.select_tab('login');
           //window.close();
           return;
         }
       }
       // unsure: could be a login form with an OTP field, but could also be a registration form.
-      // todo build UI to select mode, and depending on that do either thing.
       this.create_opts();
       return;
     } else if(this.inputs == 3) { // probably change password field
@@ -174,7 +174,7 @@ class Sphinx {
       this.select_tab('change');
       if(this.users.length == 1) { // we have only one registered user with this site, so it's easy
         this.commit_ui();
-        this.background.postMessage({ "action": "change", "site": this.site, "name": this.users[0] });
+        this.background.postMessage({ "action": "change", "site": this.site, "name": this.users[0], "mode": "insert" });
         //window.close();
         return;
       }
@@ -223,6 +223,7 @@ class Sphinx {
     // first get users associated with this site
     this.background.postMessage({
       action: "list",
+      mode: "init",
       site: this.site
     });
   }
@@ -243,7 +244,7 @@ class Sphinx {
 
   onClickCommit(event) {
     this.background.onMessage.addListener(this.commit_cb);
-    this.background.postMessage({ "action": "commit", "site": this.site, "name": this.user });
+    this.background.postMessage({ "action": "commit", "site": this.site, "name": this.user, "mode": "" });
     window.close();
   }
 
@@ -252,7 +253,7 @@ class Sphinx {
   }
 
   onClick(event) {
-    this.background.postMessage({ "action": this.mode, "site": this.site, "name": event.target.textContent });
+    this.background.postMessage({ "action": this.mode, "site": this.site, "name": event.target.textContent, "mode": "insert" });
     if(this.mode == 'login') window.close();
     else if(this.mode == 'change'){
       this.user = event.target.textContent;
@@ -263,7 +264,7 @@ class Sphinx {
   onKeyDown(event) {
     let results = document.getElementById("results");
     if (event.keyCode == 0x0d && results.children[this.selectionIndex]) {
-      this.background.postMessage({ "action": this.mode, "site": this.site, "name": results.children[this.selectionIndex].textContent });
+      this.background.postMessage({ "action": this.mode, "site": this.site, "name": results.children[this.selectionIndex].textContent, "mode": "insert" });
       if(this.mode != 'login') window.close();
       else this.commit_ui();
     } else if (event.keyCode == 0x26 && this.selectionIndex > 0)
@@ -280,15 +281,35 @@ class Sphinx {
     event.preventDefault();
   }
 
-  submitCreate() {
+  flashError(el) {
+    el.style="background: red;";
+    setTimeout(() => {
+      el.focus();
+    }, 100);
+    setTimeout(() => {
+      el.style=null;
+    }, 1000);
+  }
+
+  getpwdrules() {
     // get character class rules
     let r = "";
     for (let rule of rules) {
-      var checkbox = document.getElementById(rule['title']);
+      let checkbox = document.getElementById(rule['title']);
       if(checkbox.checked) r+=rule['value'];
     }
     if(r=="") {
-      //todo signal error
+      for (let rule of rules) {
+        let checkbox = document.getElementById(rule['title']);
+        let label = checkbox.nextSibling;
+        label.style="background: red;";
+        setTimeout(() => {
+          checkbox.focus();
+        }, 100);
+        setTimeout(() => {
+          label.style=null;
+        }, 1000);
+      }
       return;
     }
     // get password size
@@ -296,25 +317,31 @@ class Sphinx {
     let input = document.getElementById('pwdlen');
     if(input.value != '') {
       try { size = Number(input.value) } catch (e) {
-        // todo signal error
+        this.sizeError(input);
         return;
       }
     }
+    if(isNaN(size)) {
+      this.flashError(input);
+      return;
+    }
+    return [r,size];
+  }
+
+  submitCreate() {
+    let r_ = this.getpwdrules();
+    if (r_ == null) return;
+    let r=r_[0], size = r_[1];
+
     if(this.user == '') {
       if(this.search.value == '') {
-        this.search.style="background: red;";
-        setTimeout(() => {
-          this.search.focus();
-        }, 100);
-        setTimeout(() => {
-          this.search.style=null;
-        }, 1000);
+        this.flashError(this.search);
         return;
       }
       // we assume the value of the search field to be the username to be created
       this.user = this.search.value;
     }
-    this.background.postMessage({ "action": "create", "site": this.site, "name": this.user, "rules": r, "size": size });
+    this.background.postMessage({ "action": "create", "site": this.site, "name": this.user, "rules": r, "size": size, "mode": "insert" });
     window.close();
   }
 
@@ -370,6 +397,55 @@ class Sphinx {
   closeWin() {
     window.close();
   }
+
+  fetchpwd(el, eh, mode, rules, size) {
+    if(this.user == '') {
+      if(this.search.value == '') {
+        this.flashError(this.search);
+        return;
+      }
+      // we assume the value of the search field to be the username to be created
+      this.user = this.search.value;
+    }
+
+    // todo on change password when inserting new password also show save new password button
+    let fetchpwd_cb = function(response) {
+      self.background.onMessage.removeListener(self.fetchpwd_cb);
+      el.getElementsByClassName('pwd_action')[0].textContent = "Insert";
+      el.removeEventListener("click", eh); // fixme this doesn't work
+      el.addEventListener("click",function(e) {
+        // inject response.password into currently focused element
+        //browser.tabs.executeScript({ file: '/inject.js', allFrames: true }, function() {
+          browser.tabs.executeScript({code: 'document.websphinx.inject(' + JSON.stringify(response.results.password) + ');'});
+        //});
+      });
+    }
+
+    this.background.onMessage.addListener(fetchpwd_cb);
+    this.background.postMessage({ "action": mode,
+                                  "site": this.site,
+                                  "name": this.user,
+                                  "rules": rules,       // optional only used with create
+                                  "size": size,         // optional only used with create
+                                  "mode": "manual" });  // needed for background to trigger proper callback
+  }
+
+  getpwd(e) {
+    e.target.removeEventListener("click", self.getpwd); // fixme this doesn't work
+    this.fetchpwd(e.target, self.getpwd, "login", null, null);
+  }
+
+  newpwd(e) {
+    this.fetchpwd(e.target, self.newpwd, "change", null, null);
+  }
+
+  createpwd(e) {
+    let r_ = this.getpwdrules();
+    if (r_ == null) return;
+    let r=r_[0], size = r_[1];
+    this.fetchpwd(e.target, this.createpwd, "create", r, size);
+  }
+
 }
 
 document.addEventListener("DOMContentLoaded", function(event) {

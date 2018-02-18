@@ -48,7 +48,7 @@ def users(data):
     handler = SphinxHandler(datadir)
     users = handler.list(data['site'])
     res = {'names': [i.decode() for i in users],
-           'cmd': 'list',
+           'cmd': 'list', "mode": data['mode'],
            'site': data['site']}
     send_message({ 'results': res })
   except:
@@ -56,7 +56,7 @@ def users(data):
 
 def get(data):
   def callback(arg):
-    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'show'}
+    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'show', "mode": data['mode']}
     send_message({ 'results': res })
   try:
     handler = SphinxHandler(datadir)
@@ -67,7 +67,7 @@ def get(data):
 
 def create(data):
   def callback(arg):
-    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'create'}
+    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'create', "mode": data['mode']}
     send_message({ 'results': res })
   try:
     handler = SphinxHandler(datadir)
@@ -78,7 +78,7 @@ def create(data):
 
 def change(data):
   def callback(arg):
-    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'change'}
+    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'change', "mode": data['mode']}
     send_message({ 'results': res })
   try:
     handler = SphinxHandler(datadir)
@@ -89,7 +89,7 @@ def change(data):
 
 def commit(data):
   def callback(arg):
-    res = { 'result': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'commit'}
+    res = { 'result': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'commit', "mode": data['mode']}
     send_message({ 'results': res })
   try:
     handler = SphinxHandler(datadir)

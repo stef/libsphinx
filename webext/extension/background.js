@@ -33,6 +33,10 @@ nativeport.onMessage.addListener((response) => {
     portFromCS.postMessage({ status: "ERROR", error: error });
   } else if(response.results == 'fail') {
     console.log('websphinx failed');
+  } else if(response.results.mode == "manual") {
+    //console.log("manual");
+    // its a manual mode response so we just pass it to the popup
+    portFromCS.postMessage(response);
   } else if(response.results.cmd == 'show') {
     if(changeData==true) {
       // we got the old password
@@ -76,35 +80,54 @@ browser.runtime.onConnect.addListener(function(p) {
   // proxy from CS to native backend
   portFromCS.onMessage.addListener(function(request, sender, sendResponse) {
     if (request.action == "login") {
+      //console.log("login");
       changeData=false;
       nativeport.postMessage({
         cmd: "show",
+        mode: request.mode,
         site: request.site,
         name: request.name});
     } else if (request.action == "list") {
+      //console.log("list");
       nativeport.postMessage({
         cmd: request.action,
+        mode: request.mode,
         site: request.site});
     } else if (request.action == "create") {
+      //console.log("create");
       nativeport.postMessage({
         cmd: request.action,
+        mode: request.mode,
         site: request.site,
         name: request.name,
         rules: request.rules,
         size: request.size
       });
     } else if (request.action == "change") {
-      // first get old password
-      // but this will trigger the login inject in the nativport onmessage cb
-      changeData = true;
-      nativeport.postMessage({
-        cmd: "show",
-        site: request.site,
-        name: request.name
-      });
+      //console.log("change");
+      if(request.mode == "manual") {
+        nativeport.postMessage({
+          cmd: "change",
+          mode: request.mode,
+          site: request.site,
+          name: request.name
+        });
+      } else {
+        // first get old password
+        // but this will trigger the login inject in the nativport onmessage cb
+        changeData = true;
+        nativeport.postMessage({
+          cmd: "show",
+          mode: request.mode,
+          site: request.site,
+          name: request.name
+        });
+      }
     } else if (request.action == "commit") {
+      //console.log("commit");
       nativeport.postMessage({
         cmd: request.action,
+        mode: request.mode,
         site: request.site,
         name: request.name
       });
