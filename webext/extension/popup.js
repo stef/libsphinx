@@ -50,10 +50,10 @@ class Sphinx {
     document.getElementById("close").addEventListener("click",this.closeWin.bind(this));
 
     // manual get/insert buttons
-    document.getElementById("login_pwd").addEventListener("click",this.getpwd.bind(this));
-    document.getElementById("old_pwd").addEventListener("click",this.getpwd.bind(this));
-    document.getElementById("new_pwd").addEventListener("click",this.newpwd.bind(this));
-    document.getElementById("create_pwd").addEventListener("click",this.createpwd.bind(this));
+    document.getElementById("login_pwd").addEventListener("click",this.getpwd);
+    document.getElementById("old_pwd").addEventListener("click",this.getpwd);
+    document.getElementById("new_pwd").addEventListener("click",this.newpwd);
+    document.getElementById("create_pwd").addEventListener("click",this.createpwd);
 
     this.search = document.getElementById("search");
     this.search.setAttribute("placeholder", browser.i18n.getMessage("searchPlaceholder"));
@@ -431,19 +431,18 @@ class Sphinx {
   }
 
   getpwd(e) {
-    e.target.removeEventListener("click", self.getpwd); // fixme this doesn't work
-    this.fetchpwd(e.target, self.getpwd, "login", null, null);
+    self.fetchpwd(e.target, self.getpwd, "login", null, null);
   }
 
   newpwd(e) {
-    this.fetchpwd(e.target, self.newpwd, "change", null, null);
+    self.fetchpwd(e.target, self.newpwd, "change", null, null);
   }
 
   createpwd(e) {
     let r_ = this.getpwdrules();
     if (r_ == null) return;
     let r=r_[0], size = r_[1];
-    this.fetchpwd(e.target, this.createpwd, "create", r, size);
+    self.fetchpwd(e.target, self.createpwd, "create", r, size);
   }
 
 }
