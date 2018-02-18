@@ -412,7 +412,7 @@ class Sphinx {
     let fetchpwd_cb = function(response) {
       self.background.onMessage.removeListener(self.fetchpwd_cb);
       el.getElementsByClassName('pwd_action')[0].textContent = "Insert";
-      el.removeEventListener("click", eh); // fixme this doesn't work
+      el.removeEventListener("click", eh);
       el.addEventListener("click",function(e) {
         // inject response.password into currently focused element
         //browser.tabs.executeScript({ file: '/inject.js', allFrames: true }, function() {
