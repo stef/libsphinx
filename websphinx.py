@@ -22,6 +22,8 @@ import subprocess
 import os, sys, struct, json
 from sphinx import datadir, SphinxHandler
 
+log = False # '/tmp/websphinx.log'
+
 def getpwd(title):
     proc=subprocess.Popen(['pinentry-gtk-2', '-g'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate(input=('SETTITLE sphinx %spassword prompt\nSETPROMPT sphinx %spassword\ngetpin\n' % (title,title)).encode())
@@ -38,6 +40,10 @@ def getpwd(title):
 # Send message using Native messaging protocol
 def send_message(data):
   msg = json.dumps(data).encode('utf-8')
+  if log:
+    log.write(msg)
+    log.write(b'\n')
+    log.flush()
   length = struct.pack('@I', len(msg))
   sys.stdout.buffer.write(length)
   sys.stdout.buffer.write(msg)
@@ -107,6 +113,10 @@ def main():
     length = struct.unpack('i', length_bytes)[0]
     data = json.loads(sys.stdin.buffer.read(length).decode('utf-8'))
 
+    if log:
+      log.write(repr(data).encode())
+      log.write(b'\n')
+      log.flush()
     if data['cmd'] == 'show':
       get(data)
     elif data['cmd'] == 'list':
@@ -119,4 +129,5 @@ def main():
       commit(data)
 
 if __name__ == '__main__':
+  if log: log = open('/tmp/websphinx.log','ab')
   main()
