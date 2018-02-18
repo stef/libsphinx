@@ -44,6 +44,7 @@ nativeport.onMessage.addListener((response) => {
       // now change the password
       nativeport.postMessage({
         cmd: "change",
+        mode: response.results.mode,
         site: response.results.site,
         name: response.results.name
       });
