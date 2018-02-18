@@ -26,13 +26,8 @@ var browser = browser || chrome;
 
 var self = null;
 
-const rules = [{"title": "Upper", "value": 'u',},
-               {"title": "Lower", "value": 'l'},
-               {"title": "Symbols", "value": "s"},
-               {"title": "Digits", "value": "d"}];
-
 class Sphinx {
-  constructor(ui) {
+  constructor() {
     this.selectionIndex = -1;
     this.site = '';
     this.user = '';
@@ -231,7 +226,7 @@ class Sphinx {
   onBlur(event) {
     let results = document.getElementById("results");
     if (results.children[this.selectionIndex])
-      results.children[this.selectionIndex].className = null;
+      results.children[this.selectionIndex].className = '';
 
     this.selectionIndex = -1;
   }
@@ -275,7 +270,7 @@ class Sphinx {
       return;
 
     for (let e of results.getElementsByClassName('focus'))
-      e.className = null;
+      e.className = '';
 
     results.children[this.selectionIndex].className = "focus";
     event.preventDefault();
@@ -287,11 +282,16 @@ class Sphinx {
       el.focus();
     }, 100);
     setTimeout(() => {
-      el.style=null;
+      el.style='';
     }, 1000);
   }
 
   getpwdrules() {
+    const rules = [{"title": "Upper", "value": 'u',},
+                   {"title": "Lower", "value": 'l'},
+                   {"title": "Symbols", "value": "s"},
+                   {"title": "Digits", "value": "d"}];
+
     // get character class rules
     let r = "";
     for (let rule of rules) {
@@ -307,7 +307,7 @@ class Sphinx {
           checkbox.focus();
         }, 100);
         setTimeout(() => {
-          label.style=null;
+          label.style='';
         }, 1000);
       }
       return;
@@ -448,5 +448,5 @@ class Sphinx {
 }
 
 document.addEventListener("DOMContentLoaded", function(event) {
-  new Sphinx(document.getElementById("ui"));
+  new Sphinx();
 });
