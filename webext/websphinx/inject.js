@@ -21,6 +21,8 @@
 
 "use strict";
 
+var browser = browser || chrome;
+
 const FORM_MARKERS = [
   "login",
   "log-in",
