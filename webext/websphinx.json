@@ -2,7 +2,7 @@
 {
   "name": "websphinx",
   "description": "Host for communicating with PITCHFORKed Sphinx",
-  "path": "/home/s/tasks/pitchfork/src/ramload/sphinx/host/websphinx.py",
+  "path": "%PATH%/websphinx.py",
   "type": "stdio",
   "allowed_extensions": [
     "sphinx@ctrlc.hu"
