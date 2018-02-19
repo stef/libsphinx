@@ -225,7 +225,7 @@ class SphinxHandler():
     hostid = pysodium.crypto_generichash(host, salt, 32)
     return self.getusers(hostid) or []
 
-if __name__ == '__main__':
+def main():
   def usage():
     print("usage: %s create <user> <site> [u][l][d][s] [<size>]" % sys.argv[0])
     print("usage: %s <get|change|commit|delete> <user> <site>" % sys.argv[0])
@@ -265,3 +265,6 @@ if __name__ == '__main__':
     print(b'\n'.join(handler.list(sys.argv[2])).decode())
   else:
     usage()
+
+if __name__ == '__main__':
+  main()

@@ -48,31 +48,34 @@ def usage():
     print("usage: %s [d|u|s|l] [<max size>] <binary\tgenerate password with [d]igits/[u]pper/[l]ower/[s]ymbols of <max size> {default: duls}" % sys.argv[0])
     sys.exit(0)
 
+def main():
+  if len(sys.argv)>3 or sys.argv in ('-h', '--help'):
+    usage()
+
+  size = 0
+  raw = sys.stdin.buffer.read(32)
+
+  if len(sys.argv)==1:
+    rule = 'ulsd'
+
+  elif len(sys.argv)==2: # figure out if set or size
+    try:
+      size = int(sys.argv[1])
+    except ValueError:
+      # probably a set specification
+      rule = sys.argv[1]
+  else:
+    try:
+      size = int(sys.argv[2])
+    except ValueError:
+      usage();
+    rule = sys.argv[1]
+
+  if size<0:
+    print("error size must be < 0")
+    usage()
+
+  print(derive(raw,rule,size))
+
 if __name__ == '__main__':
-    if len(sys.argv)>3 or sys.argv in ('-h', '--help'):
-        usage()
-
-    size = 0
-    raw = sys.stdin.buffer.read(32)
-
-    if len(sys.argv)==1:
-        rule = 'ulsd'
-
-    elif len(sys.argv)==2: # figure out if set or size
-        try:
-            size = int(sys.argv[1])
-        except ValueError:
-            # probably a set specification
-            rule = sys.argv[1]
-    else:
-        try:
-            size = int(sys.argv[2])
-        except ValueError:
-            usage();
-        rule = sys.argv[1]
-
-    if size<0:
-        print("error size must be < 0")
-        usage()
-
-    print(derive(raw,rule,size))
+  main()
