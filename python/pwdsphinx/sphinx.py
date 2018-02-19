@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
-import pysodium, sys, os, asyncio, io, struct, binascii, sphinxlib
-import bin2pass
+import sys, os, asyncio, io, struct, binascii
+import pysodium
+from . import bin2pass, sphinxlib
+from .config import getcfg
+cfg = getcfg('sphinx')
 
-verbose = False
-addr = '127.0.0.1'
-port = 2355
-datadir = '~/.sphinx/'
+verbose = cfg['client'].getboolean('verbose')
+address = cfg['client']['address']
+port = cfg['client']['port']
+datadir = cfg['client']['datadir']
 
 CREATE=b'\x00'
 GET=b'\x66'
@@ -27,7 +30,7 @@ class SphinxClientProtocol(asyncio.Protocol):
     if verbose: print('Data sent: {!r}'.format(self.message))
 
   def data_received(self, data):
-    if verbose: print('Data received: {!r}'.format(data.decode()))
+    if verbose: print('Data received: {!r}'.format(repr(data).encode()))
 
     try:
       data = pysodium.crypto_sign_open(data, self.handler.getserverkey())
@@ -162,7 +165,7 @@ class SphinxHandler():
     self.hostid=pysodium.crypto_generichash(host, self.getsalt(), 32)
     signed=pysodium.crypto_sign(message,self.getkey())
     loop = asyncio.get_event_loop()
-    coro = loop.create_connection(lambda: SphinxClientProtocol(signed, loop, b, self, cb), addr, port)
+    coro = loop.create_connection(lambda: SphinxClientProtocol(signed, loop, b, self, cb), address, port)
     try:
       loop.run_until_complete(coro)
       loop.run_forever()
@@ -217,7 +220,7 @@ class SphinxHandler():
     salt = self.getsalt()
     hostid = pysodium.crypto_generichash(host, salt, 32)
     def callback():
-      handler.deluser(hostid,user)
+      self.deluser(hostid,user)
     self.doSphinx(message, host, None, callback)
 
   def list(self, host):
