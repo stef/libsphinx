@@ -13,7 +13,7 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(name = 'pwdsphinx',
-       version = '0.2',
+       version = '0.2.1',
        description = 'SPHINX password protocol',
        license = "GPLv3",
        author = 'Stefan Marsiske',
@@ -21,7 +21,7 @@ setup(name = 'pwdsphinx',
        url = 'https://github.com/stef/pitchforkedsphinx',
        long_description=read('README.md'),
        packages = ['pwdsphinx'],
-       install_requires = ("pysodium",),
+       install_requires = ("pysodium", "SecureString",),
        classifiers = ["Development Status :: 4 - Beta",
                       "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
                       "Topic :: Security :: Cryptography",
