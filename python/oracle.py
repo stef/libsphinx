@@ -225,7 +225,7 @@ def getkey(keydir):
     print("please share `%s` with all clients"  % (datadir+'server-key.pub'))
     return sk
 
-if __name__ == '__main__':
+def main():
   loop = asyncio.get_event_loop()
   # Each client connection will create a new protocol instance
   coro = loop.create_server(SphinxOracleProtocol, address, port)
@@ -248,3 +248,6 @@ if __name__ == '__main__':
   server.close()
   loop.run_until_complete(server.wait_closed())
   loop.close()
+
+if __name__ == '__main__':
+  main()
