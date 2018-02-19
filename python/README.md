@@ -8,11 +8,19 @@ https://eprint.iacr.org/2015/1099
 
 ## Dependencies
 
-You need to install also `pysodium` using either your OS package manager or pip.
+You need [libsphinx](https://github.com/stef/pitchforkedsphinx).
 
-## Python wrapper
+You need also to install `pysodium` using either your OS package
+manager or pip.
 
-Pitchforked sphinx comes with a python wrapper `sphinxlib`, so
+## Installation
+
+`pip install pwdsphinx` should get you started.
+
+
+## API
+
+`sphinxlib` is a `ctypes`-based python wrapper around libsphinx, so
 you can build whatever you fancy immediately in python. The interface
 exposed wraps the 3 sphinx functions from the library like this:
 
@@ -34,7 +42,7 @@ def finish(bfac, resp)
 
 returns the raw 32 byte password.
 
-The functions for the PAKE protocol are not yet exposed.
+The functions for the PAKE (OPAQUE) protocol are not yet exposed.
 
 ## Server/Client
 
