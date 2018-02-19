@@ -56,7 +56,7 @@ if __name__ == '__main__':
     raw = sys.stdin.buffer.read(32)
 
     if len(sys.argv)==1:
-        chars = sets['s']+sets['d']+sets['u']+sets['l']
+        rule = 'ulsd'
 
     elif len(sys.argv)==2: # figure out if set or size
         try:
