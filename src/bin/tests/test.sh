@@ -51,15 +51,15 @@ echo "success two runs produced the same password output"
 
 echo "transforming into ascii passwords"
 echo -n "full ascii, max size: " 
-../../../python/bin2pass.py <pwd0
+../../../python/pwdsphinx/bin2pass.py <pwd0
 echo -n "no symbols, max size: " 
-../../../python/bin2pass.py uld <pwd0
+../../../python/pwdsphinx/bin2pass.py uld <pwd0
 echo -n "no symbols, 8 chars: " 
-../../../python/bin2pass.py uld 8 <pwd0
+../../../python/pwdsphinx/bin2pass.py uld 8 <pwd0
 echo -n "only digits, 4 chars: " 
-../../../python/bin2pass.py d 4 <pwd0
+../../../python/pwdsphinx/bin2pass.py d 4 <pwd0
 echo -n "only letters, 16 chars: " 
-../../../python/bin2pass.py ul 16 <pwd0
+../../../python/pwdsphinx/bin2pass.py ul 16 <pwd0
 
 rm pwd0
 
