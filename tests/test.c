@@ -1,4 +1,4 @@
-#include "sphinx.h"
+#include "../sphinx.h"
 #include <stdio.h>
 #include <stdint.h>
 

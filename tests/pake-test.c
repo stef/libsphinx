@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "pake.h"
+#include "../pake.h"
 
 static void dump(const uint8_t *p, const size_t len, const char* msg) {
   int i;

@@ -33,11 +33,11 @@ standalone/derive: $(objs) standalone/derive.c
 libsphinx.so: $(objs) sphinx.o pake.o
 	$(CC) -shared -fpic $(CFLAGS) -o $@ $(objs) pake.o sphinx.o $(LDFLAGS)
 
-tests/sphinx: test.c libsphinx.so
-	gcc $(CFLAGS) -o tests/sphinx test.c -lsphinx $(LDFLAGS) $(objs)
+tests/sphinx: tests/test.c libsphinx.so
+	gcc $(CFLAGS) -o tests/sphinx tests/test.c -lsphinx $(LDFLAGS) $(objs)
 
-tests/pake: pake-test.c libsphinx.so
-	gcc $(CFLAGS) -o tests/pake pake-test.c -lsphinx $(LDFLAGS) $(objs)
+tests/pake: tests/pake-test.c libsphinx.so
+	gcc $(CFLAGS) -o tests/pake tests/pake-test.c -lsphinx $(LDFLAGS) $(objs)
 
 clean:
 	@rm -f standalone/sphinx standalone/challenge standalone/respond standalone/derive libsphinx.so *.o *.pyc || true
