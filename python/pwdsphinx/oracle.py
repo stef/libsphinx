@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 
-import asyncio, datetime, pysodium, os, binascii, shutil, sphinxlib, sys
+import asyncio, datetime, os, binascii, shutil, sys
+from SecureString import clearmem
+import pysodium
+from . import sphinxlib
+from .config import getcfg
+cfg = getcfg('sphinx')
 
-verbose = False
-address = '127.0.0.1'
-port = 2355
-datadir = 'data/'
-keydir = '~/.sphinx/'
-key = None
+verbose = cfg['server'].getboolean('verbose')
+address = cfg['server']['address']
+port = cfg['server']['port']
+datadir = cfg['server']['datadir']
+keydir = cfg['server']['keydir']
+
+if(verbose):
+  cfg.write(sys.stdout)
 
 CREATE=0x00
 GET=0x66
@@ -64,10 +71,10 @@ class SphinxOracleProtocol(asyncio.Protocol):
       os.fchmod(fd.fileno(),0o600)
       fd.write(pk)
 
-    key=pysodium.randombytes(32)
+    k=pysodium.randombytes(32)
     with open(tdir+'/key','wb') as fd:
       os.fchmod(fd.fileno(),0o600)
-      fd.write(key)
+      fd.write(k)
 
     return respond(chal, id)
 
@@ -110,13 +117,13 @@ class SphinxOracleProtocol(asyncio.Protocol):
     chal = data[33:65]
 
     tdir = datadir+binascii.hexlify(id).decode()
-    key=pysodium.randombytes(32)
+    k=pysodium.randombytes(32)
     with open(tdir+'/new','wb') as fd:
       os.fchmod(fd.fileno(),0o600)
-      fd.write(key)
+      fd.write(k)
 
     try:
-      return sphinxlib.respond(chal, key)
+      return sphinxlib.respond(chal, k)
     except ValueError:
       if verbose: print("respond fail")
       return b'fail'
@@ -137,18 +144,18 @@ class SphinxOracleProtocol(asyncio.Protocol):
 
     try:
       with open(tdir+'/new','rb') as fd:
-        key = fd.read()
+        k = fd.read()
     except FileNotFoundError:
       return b'fail'
 
     os.unlink(tdir+'/new')
 
-    if(len(key)!=32):
+    if(len(k)!=32):
       return b'fail'
 
     with open(tdir+'/key','wb') as fd:
       os.fchmod(fd.fileno(),0o600)
-      fd.write(key)
+      fd.write(k)
 
     return b'ok'
 
@@ -199,7 +206,9 @@ class SphinxOracleProtocol(asyncio.Protocol):
     if verbose:
       print('Send: {!r}'.format(res))
 
+    key = getkey(keydir)
     res=pysodium.crypto_sign(res,key)
+    clearmem(key)
     self.transport.write(res)
 
     if verbose:
@@ -235,6 +244,7 @@ def main():
   if key == None:
     print("no signing key available.\nabort")
     sys.exit(1)
+  del key
 
   # Serve requests until Ctrl+C is pressed
   if verbose:
