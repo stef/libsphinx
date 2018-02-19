@@ -104,6 +104,7 @@ def commit(data):
     send_message({ 'results': 'fail' })
 
 def main():
+  if log: log = open('/tmp/websphinx.log','ab')
   while True:
     # Read message using Native messaging protocol
     length_bytes = sys.stdin.buffer.read(4)
@@ -129,5 +130,4 @@ def main():
       commit(data)
 
 if __name__ == '__main__':
-  if log: log = open('/tmp/websphinx.log','ab')
   main()
