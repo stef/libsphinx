@@ -20,7 +20,7 @@
 
 import subprocess
 import os, sys, struct, json
-from sphinx import datadir, SphinxHandler
+from pwdsphinx.sphinx import datadir, SphinxHandler
 
 log = False # '/tmp/websphinx.log'
 
@@ -62,7 +62,7 @@ def users(data):
 
 def get(data):
   def callback(arg):
-    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'show', "mode": data['mode']}
+    res = { 'password': arg, 'name': data['name'], 'site': data['site'], 'cmd': 'login', "mode": data['mode']}
     send_message({ 'results': res })
   try:
     handler = SphinxHandler(datadir)
@@ -104,6 +104,7 @@ def commit(data):
     send_message({ 'results': 'fail' })
 
 def main():
+  global log
   if log: log = open('/tmp/websphinx.log','ab')
   while True:
     # Read message using Native messaging protocol
@@ -118,7 +119,7 @@ def main():
       log.write(repr(data).encode())
       log.write(b'\n')
       log.flush()
-    if data['cmd'] == 'show':
+    if data['cmd'] == 'login':
       get(data)
     elif data['cmd'] == 'list':
       users(data)
