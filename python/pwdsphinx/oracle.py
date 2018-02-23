@@ -3,8 +3,8 @@
 import asyncio, datetime, os, binascii, shutil, sys
 from SecureString import clearmem
 import pysodium
-from . import sphinxlib
-from .config import getcfg
+from pwdsphinx import sphinxlib
+from pwdsphinx.config import getcfg
 cfg = getcfg('sphinx')
 
 verbose = cfg['server'].getboolean('verbose')
