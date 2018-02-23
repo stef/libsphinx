@@ -2,8 +2,9 @@
 
 import sys, os, asyncio, io, struct, binascii
 import pysodium
-from . import bin2pass, sphinxlib
-from .config import getcfg
+from pwdsphinx import bin2pass, sphinxlib
+from pwdsphinx.config import getcfg
+
 cfg = getcfg('sphinx')
 
 verbose = cfg['client'].getboolean('verbose')
