@@ -5,12 +5,6 @@
   "description": "__MSG_extDescription__",
   "version": "0.1",
   "default_locale": "en",
-  "applications": {
-    "gecko": {
-      "id": "sphinx@ctrlc.hu",
-      "strict_min_version": "50.0"
-    }
-  },
 
   "background": {
     "persistent": true,
