@@ -49,6 +49,9 @@ class Sphinx {
     document.getElementById("old_pwd").addEventListener("click",this.getpwd);
     document.getElementById("new_pwd").addEventListener("click",this.newpwd);
     document.getElementById("create_pwd").addEventListener("click",this.createpwd);
+    document.getElementById('save_pwd').addEventListener("click", this.onClickCommit.bind(this));
+
+    document.getElementById("autofill").addEventListener("click", this.onAutoClick);
 
     this.search = document.getElementById("search");
     this.search.setAttribute("placeholder", browser.i18n.getMessage("searchPlaceholder"));
@@ -59,6 +62,15 @@ class Sphinx {
   }
 
   userList() {
+    let autofill = document.getElementById("autofill");
+    if(this.user!='') {
+      this.search.value=this.user;
+      autofill.removeEventListener("click", this.submitCreate);
+      autofill.addEventListener("click", this.onAutoClick);
+      autofill.className = "insert";
+    } else {
+      autofill.className = "hidden";
+    }
     setTimeout(() => {
       this.search.focus();
     }, 100);
@@ -81,8 +93,6 @@ class Sphinx {
         ul.appendChild(item);
       }
     }
-    let autofill_btn = document.getElementById("autofill");
-    autofill_btn.className = "hidden";
   }
 
   create_opts() {
@@ -102,40 +112,32 @@ class Sphinx {
         size_wdgt.focus();
       }, 100);
     }
-    let autofill_btn = document.getElementById("autofill");
-    autofill_btn.addEventListener("click", this.onClickCreate.bind(this));
-  }
-
-  commit_ui() {
-    this.select_tab('change');
-    document.getElementById("change_phase1").className = "hidden";
-    document.getElementById("change_phase2").className = null;
-    document.getElementById('save_pwd').addEventListener("click", this.onClickCommit.bind(this));
-    document.getElementById("autofill").className = "hidden";
-    document.getElementById("results").className = "hidden";
+    let autofill = document.getElementById("autofill");
+    autofill.removeEventListener("click", this.onAutoClick);
+    autofill.addEventListener("click", this.submitCreate);
+    autofill.className = "insert";
   }
 
   decide() {
     if(this.inputs == 1) { // one password field -> probably login
       // only one user in our db - use that to auto login
-
-      // todo
-      // hide autofill button
-
       this.mode = 'login';
       this.select_tab('login');
 
       if(this.users.length == 1) {
-        this.background.postMessage({ "action": "login", "site": this.site, "name": this.users[0], "mode": "insert" });
+        //this.background.postMessage({ "action": "login", "site": this.site, "name": this.users[0], "mode": "insert" });
+        this.user = this.users[0];
         //window.close();
-        return;
+        //return;
       }
       // user set in the forms user field, auto select that user
       for(let user of this.users) {
         if(user == this.user && user != '') {
-          this.background.postMessage({ "action": "login", "site": this.site, "name": user, "mode": "insert" });
+          //this.background.postMessage({ "action": "login", "site": this.site, "name": user, "mode": "insert" });
+          this.user = user;
+          break;
           //window.close();
-          return;
+          //return;
         }
       }
       // can't decide let user select which username to use for login
@@ -151,9 +153,10 @@ class Sphinx {
       // login form
       for(let user of this.users) {
         if(user == this.user && user != '') {
-          this.background.postMessage({ "action": "login", "site": this.site, "name": user, "mode": "insert" });
-          this.select_tab('login');
+          //this.background.postMessage({ "action": "login", "site": this.site, "name": user, "mode": "insert" });
           //window.close();
+          this.user = user;
+          this.userList();
           return;
         }
       }
@@ -166,14 +169,14 @@ class Sphinx {
         this.create_opts();
         return;
       }
-      this.select_tab('change');
       if(this.users.length == 1) { // we have only one registered user with this site, so it's easy
-        this.commit_ui();
-        this.background.postMessage({ "action": "change", "site": this.site, "name": this.users[0], "mode": "insert" });
+        //this.background.postMessage({ "action": "change", "site": this.site, "name": this.users[0], "mode": "insert" });
+        this.user = this.users[0];
         //window.close();
-        return;
+        //return;
       }
       // choose user to change password for
+      this.select_tab('change');
       this.mode = "change";
       this.userList();
     } else {
@@ -231,37 +234,28 @@ class Sphinx {
     this.selectionIndex = -1;
   }
 
-  commit_cb(response) {
-    self.background.onMessage.removeListener(self.commit_cb);
-    console.log(response);
-    // todo better handling
-  }
-
   onClickCommit(event) {
-    this.background.onMessage.addListener(this.commit_cb);
     this.background.postMessage({ "action": "commit", "site": this.site, "name": this.user, "mode": "" });
+    // todo instead of closing the window perhaps provide some feedback regarding (non-)success of this op?
     window.close();
   }
 
-  onClickCreate(event) {
-    this.submitCreate();
+  onAutoClick(event) {
+    self.background.postMessage({ "action": self.mode, "site": self.site, "name": self.search.value, "mode": "insert" });
   }
 
   onClick(event) {
     this.background.postMessage({ "action": this.mode, "site": this.site, "name": event.target.textContent, "mode": "insert" });
-    if(this.mode == 'login') window.close();
-    else if(this.mode == 'change'){
-      this.user = event.target.textContent;
-      this.commit_ui();
-    }
   }
 
   onKeyDown(event) {
     let results = document.getElementById("results");
-    if (event.keyCode == 0x0d && results.children[this.selectionIndex]) {
-      this.background.postMessage({ "action": this.mode, "site": this.site, "name": results.children[this.selectionIndex].textContent, "mode": "insert" });
-      if(this.mode != 'login') window.close();
-      else this.commit_ui();
+    if (event.keyCode == 0x0d) {
+      if(this.search.value!='') {
+          this.background.postMessage({ "action": this.mode, "site": this.site, "name": this.search.value, "mode": "insert" });
+      } else if(results.children[this.selectionIndex]) {
+        this.background.postMessage({ "action": this.mode, "site": this.site, "name": results.children[this.selectionIndex].textContent, "mode": "insert" });
+      }
     } else if (event.keyCode == 0x26 && this.selectionIndex > 0)
       this.selectionIndex--;
     else if (event.keyCode == 0x28 && this.selectionIndex < results.childElementCount - 1)
@@ -272,7 +266,9 @@ class Sphinx {
     for (let e of results.getElementsByClassName('focus'))
       e.className = '';
 
-    results.children[this.selectionIndex].className = "focus";
+    if(this.selectionIndex >= 0 && this.selectionIndex < results.childElementCount) {
+      results.children[this.selectionIndex].className = "focus";
+    }
     event.preventDefault();
   }
 
@@ -329,20 +325,20 @@ class Sphinx {
   }
 
   submitCreate() {
-    let r_ = this.getpwdrules();
+    let r_ = self.getpwdrules();
     if (r_ == null) return;
     let r=r_[0], size = r_[1];
 
-    if(this.user == '') {
-      if(this.search.value == '') {
-        this.flashError(this.search);
+    if(self.user == '') {
+      if(self.search.value == '') {
+        self.flashError(self.search);
         return;
       }
       // we assume the value of the search field to be the username to be created
-      this.user = this.search.value;
+      self.user = self.search.value;
     }
-    this.background.postMessage({ "action": "create", "site": this.site, "name": this.user, "rules": r, "size": size, "mode": "insert" });
-    window.close();
+    self.background.postMessage({ "action": "create", "site": self.site, "name": self.user, "rules": r, "size": size, "mode": "insert" });
+    //window.close();
   }
 
   onKeyDownCreate(event) {
@@ -408,20 +404,6 @@ class Sphinx {
       this.user = this.search.value;
     }
 
-    // todo on change password when inserting new password also show save new password button
-    let fetchpwd_cb = function(response) {
-      self.background.onMessage.removeListener(self.fetchpwd_cb);
-      el.getElementsByClassName('pwd_action')[0].textContent = "Insert";
-      el.removeEventListener("click", eh);
-      el.addEventListener("click",function(e) {
-        // inject response.password into currently focused element
-        //browser.tabs.executeScript({ file: '/inject.js', allFrames: true }, function() {
-          browser.tabs.executeScript({code: 'document.websphinx.inject(' + JSON.stringify(response.results.password) + ');'});
-        //});
-      });
-    }
-
-    this.background.onMessage.addListener(fetchpwd_cb);
     this.background.postMessage({ "action": mode,
                                   "site": this.site,
                                   "name": this.user,
@@ -439,7 +421,7 @@ class Sphinx {
   }
 
   createpwd(e) {
-    let r_ = this.getpwdrules();
+    let r_ = self.getpwdrules();
     if (r_ == null) return;
     let r=r_[0], size = r_[1];
     self.fetchpwd(e.target, self.createpwd, "create", r, size);
