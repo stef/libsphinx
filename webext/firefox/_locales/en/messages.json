@@ -1,0 +1,11 @@
+{
+  "extDescription": {
+    "message": "Web extension for PITCHFORKed Sphinx"
+  },
+  "sizePlaceholder": {
+    "message": "Size"
+  },
+  "searchPlaceholder": {
+    "message": "User name "
+  }
+}
