@@ -23,7 +23,7 @@ CHANGE=0xaa
 DELETE=0xff
 
 def respond(chal, id):
-  keyf = datadir+binascii.hexlify(id).decode()+'/key'
+  keyf = os.path.expanduser(datadir+binascii.hexlify(id).decode()+'/key')
   if not os.path.exists(keyf):
     print(keyf,'not exist')
     return b'fail' # key not found
@@ -59,7 +59,7 @@ class SphinxOracleProtocol(asyncio.Protocol):
       return b'fail'
     id = data[1:33]
     chal = data[33:65]
-    tdir = datadir+binascii.hexlify(id).decode()
+    tdir = os.path.expanduser(datadir+binascii.hexlify(id).decode())
 
     if os.path.exists(tdir):
       print(tdir, 'exists')
@@ -80,7 +80,7 @@ class SphinxOracleProtocol(asyncio.Protocol):
 
   def getpk(self,data):
     id = data[65:97]
-    tdir = datadir+binascii.hexlify(id).decode()
+    tdir = os.path.expanduser(datadir+binascii.hexlify(id).decode())
     with open(tdir+'/pub','rb') as fd:
       return fd.read()
 
@@ -116,7 +116,7 @@ class SphinxOracleProtocol(asyncio.Protocol):
     id = data[1:33]
     chal = data[33:65]
 
-    tdir = datadir+binascii.hexlify(id).decode()
+    tdir = os.path.expanduser(datadir+binascii.hexlify(id).decode())
     k=pysodium.randombytes(32)
     with open(tdir+'/new','wb') as fd:
       os.fchmod(fd.fileno(),0o600)
@@ -140,7 +140,7 @@ class SphinxOracleProtocol(asyncio.Protocol):
       print('invalid signature')
       return b'fail'
     id = data[1:33]
-    tdir = datadir+binascii.hexlify(id).decode()
+    tdir = os.path.expanduser(datadir+binascii.hexlify(id).decode())
 
     try:
       with open(tdir+'/new','rb') as fd:
@@ -173,7 +173,7 @@ class SphinxOracleProtocol(asyncio.Protocol):
       return b'fail'
     id = data[1:33]
 
-    tdir = datadir+binascii.hexlify(id).decode()
+    tdir = os.path.expanduser(datadir+binascii.hexlify(id).decode())
     shutil.rmtree(tdir)
     return b'ok'
 
