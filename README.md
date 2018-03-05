@@ -1,17 +1,11 @@
-libdecaf-based sphinx password storage implementation
+sphinx: a password **S**tore that **P**erfectly **H**ides from **I**tself
+(**N**o **X**aggeration)
 
-sphinx: a password *S*tore that *P*erfectly *H*ides from *I*tself
-(*N*o *X*aggeration)
-
-pitchforked sphinx is a cryptographic password storage as described in
+libsphinx is a cryptographic password storage as described in
 https://eprint.iacr.org/2015/1099
 
 and as presented by the Levchin Prize winner 2018 Hugo Krawczyk on
 Real World Crypto https://www.youtube.com/watch?v=px8hiyf81iM
-
-pitchforked sphinx comes with variety of interfaces: a library, a
-python wrapper around that library, a network server/client written in
-python and simple command-line binaries.
 
 ## What is this thing?
 
@@ -44,19 +38,19 @@ it's unique and cannot be used to login to other sites or services.
 ## Installing
 
 Install `libsodium` using your operating system provided package
-management. And if you use any of the python goodies you need to
-install also `pysodium` using either your OS package manager or pip.
+management. 
 
-Building everything should be quite simple afterwards:
+Building everything should (hopefully) be quite simple afterwards:
 
 ```
 git submodule init
+cd src
 make
 ```
 
 ## Library
 
-Pitchforked sphinx builds a library, which you can use to build your
+libsphinx builds a library, which you can use to build your
 own password manager either in C/C++ or any other language that can
 bind to this library. The library also contains an experimental
 version of the PKI-free PAKE protocol from page 18 of the paper.
@@ -156,7 +150,7 @@ function return 1, otherwise 0.
 
 ## Standalone Binaries
 
-pitchforked sphinx comes with very simple binaries, so you can build
+libsphinx comes with very simple binaries, so you can build
 your own password storage even from shell scripts. Each step in the
 protocol is handled by one binary:
 
@@ -190,12 +184,14 @@ The derived password is sent to standard output and currently is a 32 byte
 binary string.
 
 ### step 4 - transform into ASCII password
+
 The output from step 3 is a 32 byte binary string, most passwords have some
 limitations to accept only printable - ASCII - chars. `bin2pass.py` is a python
-script which takes a binary input on standard input and transforms it into an
-ASCII password. It can have max two parameters the classes of characters
-allowed ([*u*]pper-, [*l*]ower-case letters, [*d*]igits and [*s*]ymbols) and
-the size of the password. The following examples should make this clear:
+script in the [pwdsphinx](https://github.com/stef/pwdsphinx) python module which takes a binary input on standard
+input and transforms it into an ASCII password. It can have max two parameters
+the classes of characters allowed ([**u**]pper-, [**l**]ower-case letters,
+[**d**]igits and [**s**]ymbols) and the size of the password. The following
+examples should make this clear:
 
 Full ASCII, max size:
 ```
