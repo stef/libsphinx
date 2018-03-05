@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 
-import sys, os, asyncio, io, struct, binascii
+import sys, os, asyncio, io, struct, binascii, platform
 import pysodium
-from pwdsphinx import bin2pass, sphinxlib
-from pwdsphinx.config import getcfg
+
+try:
+  from pwdsphinx import bin2pass, sphinxlib
+  from pwdsphinx.config import getcfg
+except ImportError:
+  import bin2pass, sphinxlib
+  from config import getcfg
+
+win=False
+if platform.system() == 'Windows':
+  win=True
 
 cfg = getcfg('sphinx')
 
@@ -75,7 +84,7 @@ class SphinxHandler():
         os.mkdir(datadir,0o700)
       pk, sk = pysodium.crypto_sign_keypair()
       with open(datadir+'key','wb') as fd:
-        os.fchmod(fd.fileno(),0o600)
+        if not win: os.fchmod(fd.fileno(),0o600)
         fd.write(sk)
       return sk
 
@@ -87,9 +96,11 @@ class SphinxHandler():
       fd.close()
       return salt
     except FileNotFoundError:
+      if not os.path.exists(datadir):
+        os.mkdir(datadir,0o700)
       salt = pysodium.randombytes(32)
       with open(datadir+'salt','wb') as fd:
-        os.fchmod(fd.fileno(),0o600)
+        if not win: os.fchmod(fd.fileno(),0o600)
         fd.write(salt)
       return salt
 
@@ -152,6 +163,14 @@ class SphinxHandler():
     datadir = os.path.expanduser(self.datadir)
     try:
       with open(datadir+'server-key.pub', 'rb') as fd:
+        key = fd.read()
+      return key
+    except FileNotFoundError:
+      pass
+    # try in installation dir
+    BASEDIR = os.path.dirname(os.path.abspath(__file__))
+    try:
+      with open(BASEDIR+'/server-key.pub', 'rb') as fd:
         key = fd.read()
       return key
     except FileNotFoundError:

@@ -19,13 +19,22 @@
 #
 
 import subprocess
-import os, sys, struct, json
-from pwdsphinx.sphinx import datadir, SphinxHandler
+import os, sys, struct, json, platform
+try:
+    from pwdsphinx.sphinx import datadir, SphinxHandler
+except ImportError:
+    from sphinx import datadir, SphinxHandler
+
+if platform.system() == 'Windows':
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    pinentry=os.path.join(BASE_DIR,'pinentry-qt.exe')
+else:
+    pinentry='pinentry-gtk-2'
 
 log = False # '/tmp/websphinx.log'
 
 def getpwd(title):
-    proc=subprocess.Popen(['pinentry-gtk-2', '-g'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc=subprocess.Popen([pinentry, '-g'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate(input=('SETTITLE sphinx %spassword prompt\nSETPROMPT sphinx %spassword\ngetpin\n' % (title,title)).encode())
     if proc.returncode == 0:
         for line in out.split(b'\n'):
@@ -105,7 +114,7 @@ def commit(data):
 
 def main():
   global log
-  if log: log = open('/tmp/websphinx.log','ab')
+  if log: log = open(log,'ab')
   while True:
     # Read message using Native messaging protocol
     length_bytes = sys.stdin.buffer.read(4)
