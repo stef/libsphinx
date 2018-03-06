@@ -11,37 +11,53 @@ INC=-Igoldilocks/src/GENERATED/include -I/usr/include/sodium
 LIBS=-lsodium
 CFLAGS=$(INC) -Wall -Os
 LDFLAGS=-g $(LIBS)
+CC=gcc
+SOEXT=so
 
 all: bin libsphinx.so tests
-
 bin: bin/challenge bin/respond bin/derive
 
-tests: tests/pake tests/sphinx
+win: CC=x86_64-w64-mingw32-gcc
+win: INC=-Igoldilocks/src/GENERATED/include -Iwin/libsodium-win64/include/sodium -Iwin/libsodium-win64/include
+win: LIBS=-L. -Lwin/libsodium-win64/lib/ -Wl,-Bstatic -lsodium -Wl,-Bdynamic
+win: SOEXT=dll
+win: EXT=.exe
+win: MAKETARGET=win
+win: win/libsodium-win64 exe libsphinx.$(SOEXT) tests$(EXT)
+exe: bin/challenge$(EXT) bin/respond$(EXT) bin/derive$(EXT)
+
+tests$(EXT): tests/pake$(EXT) tests/sphinx$(EXT)
 
 $(objs):
-	cd goldilocks; make
+	cd goldilocks; OFLAGS='' ARCHFLAGS='' make $(MAKETARGET)
 
-bin/challenge: $(objs) bin/challenge.c
-	gcc $(CFLAGS) -o bin/challenge bin/challenge.c $(LDFLAGS) $(objs)
+bin/challenge$(EXT): $(objs) bin/challenge.c
+	$(CC) $(CFLAGS) -o bin/challenge$(EXT) bin/challenge.c $(LDFLAGS) $(objs)
 
-bin/respond: $(objs) bin/respond.c
-	gcc $(CFLAGS) -o bin/respond bin/respond.c $(LDFLAGS) $(objs)
+bin/respond$(EXT): $(objs) bin/respond.c
+	$(CC) $(CFLAGS) -o bin/respond$(EXT) bin/respond.c $(LDFLAGS) $(objs)
 
-bin/derive: $(objs) bin/derive.c
-	gcc $(CFLAGS) -o bin/derive bin/derive.c $(LDFLAGS) $(objs)
+bin/derive$(EXT): $(objs) bin/derive.c
+	$(CC) $(CFLAGS) -o bin/derive$(EXT) bin/derive.c $(LDFLAGS) $(objs)
 
-libsphinx.so: $(objs) sphinx.o pake.o
-	$(CC) -shared -fpic $(CFLAGS) -o $@ $(objs) pake.o sphinx.o $(LDFLAGS)
+libsphinx.$(SOEXT): $(objs) sphinx.o pake.o
+	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $(objs) pake.o sphinx.o $(LDFLAGS)
 
-tests/sphinx: tests/test.c libsphinx.so
-	gcc $(CFLAGS) -o tests/sphinx tests/test.c -lsphinx $(LDFLAGS) $(objs)
+tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
+	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -lsphinx $(LDFLAGS) $(objs)
 
-tests/pake: tests/pake-test.c libsphinx.so
-	gcc $(CFLAGS) -o tests/pake tests/pake-test.c -lsphinx $(LDFLAGS) $(objs)
+tests/pake$(EXT): tests/pake-test.c libsphinx.$(SOEXT)
+	$(CC) $(CFLAGS) -o tests/pake$(EXT) tests/pake-test.c -lsphinx $(LDFLAGS) $(objs)
+
+win/libsodium-win64:
+	@echo 'win/libsodium-win64 not found.'
+	@echo 'download and unpack latest libsodium-*-mingw.tar.gz and unpack into win/'
+	@echo 'https://download.libsodium.org/libsodium/releases/'
+	@false
 
 clean:
-	@rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so *.o *.pyc || true
-	@rm -f tests/sphinx tests/pake || true
-	@rm -rf __pycache__ || true
+	rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so
+	rm -f tests/sphinx tests/pake tests/sphinx.exe tests/pake.exe *.o
+	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
 .PHONY: bin clean
