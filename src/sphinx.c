@@ -26,7 +26,7 @@
  * bfac: (output) pointer to array of DECAF_255_SCALAR_BYTES (32) bytes - the blinding factor
  * chal: (output) pointer to array of DECAF_255_SER_BYTES (32) bytes - the challenge
  */
-void challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *chal) {
+void sphinx_challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *chal) {
   unsigned char hash[DECAF_255_HASH_BYTES];
   crypto_generichash(hash, sizeof hash, pwd, p_len, 0, 0);
   // hashed_to_point with elligator the password hash
@@ -58,7 +58,7 @@ void challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *c
  * resp: (output) the response, DECAF_255_SER_BYTES (32) bytes array
  * returns 1 on error, 0 on success
  */
-int respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
+int sphinx_respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
   // deserialize challenge into C
   decaf_255_point_t C, R;
   if(DECAF_SUCCESS!=decaf_255_point_decode(C, chal, DECAF_FALSE)) return 1;
@@ -82,7 +82,7 @@ int respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
  * rwd: (output) the derived password, DECAF_255_SER_BYTES (32) bytes array
  * returns 1 on error, 0 on success
  */
-int finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
+int sphinx_finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
   // decode blinding factor into scalar
   decaf_255_scalar_t b;
   decaf_255_scalar_decode_long(b, bfac, DECAF_255_SCALAR_BYTES);

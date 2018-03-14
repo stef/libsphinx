@@ -10,11 +10,11 @@ int main(void) {
     resp[SPHINX_255_SER_BYTES],
     rwd[SPHINX_255_SER_BYTES];
 
-  challenge(pwd, sizeof pwd, bfac, chal);
-  if(0!=respond(chal, secret, resp)) {
+  sphinx_challenge(pwd, sizeof pwd, bfac, chal);
+  if(0!=sphinx_respond(chal, secret, resp)) {
     return 1;
   }
-  if(0!=finish(bfac, resp, rwd)) {
+  if(0!=sphinx_finish(bfac, resp, rwd)) {
     return 1;
   }
 
