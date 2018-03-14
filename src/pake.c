@@ -27,7 +27,7 @@
 #include <sodium/utils.h>
 
 // server shares pk as P_s with client_init
-void server_init(uint8_t *p_s, uint8_t *P_s) {
+void opaque_server_init(uint8_t *p_s, uint8_t *P_s) {
   randombytes(p_s, DECAF_X25519_PRIVATE_BYTES); // random secret key
   decaf_x25519_derive_public_key(P_s, p_s);
 }
@@ -65,8 +65,8 @@ static void oprf(const uint8_t *x, const size_t x_len, const uint8_t *k, uint8_t
 }
 
 // sends c, C, k_s , P_u , m_u to server
-void client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_s,  // input params
-                 uint8_t k_s[32], uint8_t c[32], uint8_t C[32], uint8_t P_u[32], uint8_t m_u[32]) { // output params
+void opaque_client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_s,  // input params
+                        uint8_t k_s[32], uint8_t c[32], uint8_t C[32], uint8_t P_u[32], uint8_t m_u[32]) { // output params
   uint8_t z[32], tmp[32];
   // U chooses z ∈_R {0, 1}^τ
   randombytes(z, 32);
@@ -113,9 +113,9 @@ void client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_s,  
 }
 
 // done by user
-void start_pake(const uint8_t *rwd, const size_t rwd_len, // input params
-                uint8_t alpha[32], uint8_t x_u[32],      // output params
-                uint8_t X_u[32], uint8_t sp[32]) {
+void opaque_start_pake(const uint8_t *rwd, const size_t rwd_len, // input params
+                       uint8_t alpha[32], uint8_t x_u[32],      // output params
+                       uint8_t X_u[32], uint8_t sp[32]) {
   // choose ρ, x_u ← Z_q
   randombytes(sp, 32);
   decaf_255_scalar_t p;
@@ -173,11 +173,11 @@ static int server_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], c
 //            c, C, P_u , m_u, (received from U in init)
 //            P_s (from server init),
 //            X_s (from here)
-int server_pake(const uint8_t alpha[32], const uint8_t X_u[32],  // input params
-                const uint8_t k_s[32], const uint8_t P_u[32],
-                const uint8_t p_s[32],
-                uint8_t beta[32], uint8_t X_s[32],               // output params
-                uint8_t SK[DECAF_X25519_PUBLIC_BYTES]) {         // this is the final result: shared secret from the PAKE
+int opaque_server_pake(const uint8_t alpha[32], const uint8_t X_u[32],  // input params
+                       const uint8_t k_s[32], const uint8_t P_u[32],
+                       const uint8_t p_s[32],
+                       uint8_t beta[32], uint8_t X_s[32],               // output params
+                       uint8_t SK[DECAF_X25519_PUBLIC_BYTES]) {         // this is the final result: shared secret from the PAKE
   decaf_255_point_t Alpha;
   if(DECAF_SUCCESS!=decaf_255_point_decode(Alpha, alpha, DECAF_FALSE)) return 1;
 
@@ -221,11 +221,11 @@ static int user_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], con
   return 0;
 }
 
-int user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
-              const uint8_t x_u[32], const uint8_t beta[32], const uint8_t c[32],
-              const uint8_t C[32], const uint8_t P_u[32], const uint8_t m_u[32],
-              const uint8_t P_s[32], const uint8_t X_s[32],
-              uint8_t SK[DECAF_X25519_PUBLIC_BYTES]) {
+int opaque_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
+                     const uint8_t x_u[32], const uint8_t beta[32], const uint8_t c[32],
+                     const uint8_t C[32], const uint8_t P_u[32], const uint8_t m_u[32],
+                     const uint8_t P_s[32], const uint8_t X_s[32],
+                     uint8_t SK[DECAF_X25519_PUBLIC_BYTES]) {
   // note: β, c, C, P_u , m_u , P_s , X_s are sent by server_pake
   // sp(==p) is from start_pake
   // Sets z = c ⊕ H(rwd, β^(1/ρ)), r = f_z(0), p_u = f_z (1) mod q.
