@@ -7,6 +7,7 @@ objs=goldilocks/build/obj/curve25519/decaf.o \
 		goldilocks/build/obj/p25519/f_arithmetic.o \
 		goldilocks/build/obj/curve25519/elligator.o
 
+PREFIX?=/usr/local
 INC=-Igoldilocks/src/GENERATED/include -I/usr/include/sodium
 LIBS=-lsodium
 CFLAGS=$(INC) -Wall -Os
@@ -55,9 +56,17 @@ win/libsodium-win64:
 	@echo 'https://download.libsodium.org/libsodium/releases/'
 	@false
 
+install: $(PREFIX)/lib/libsphinx.$(SOEXT) $(PREFIX)/include/sphinx.h
+
+$(PREFIX)/lib/libsphinx.$(SOEXT): libsphinx.$(SOEXT)
+	cp $< $@
+
+$(PREFIX)/include/sphinx.h: sphinx.h
+	cp $< $@
+
 clean:
 	rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so
 	rm -f tests/sphinx tests/pake tests/sphinx.exe tests/pake.exe *.o
 	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
-.PHONY: bin clean
+.PHONY: bin clean install
