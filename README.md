@@ -37,13 +37,14 @@ it's unique and cannot be used to login to other sites or services.
 
 ## Installing
 
-Install `libsodium` using your operating system provided package
-management. 
+Install `libsodium`  and `libsodium-dev` using your operating system provided
+package management. 
 
 Building everything should (hopefully) be quite simple afterwards:
 
 ```
 git submodule init
+git submodule update --recursive --remote
 cd src
 make
 ```
