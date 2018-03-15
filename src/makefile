@@ -45,10 +45,10 @@ libsphinx.$(SOEXT): $(objs) sphinx.o pake.o
 	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $(objs) pake.o sphinx.o $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
-	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -lsphinx $(LDFLAGS) $(objs)
+	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -L. -lsphinx $(LDFLAGS) $(objs)
 
 tests/pake$(EXT): tests/pake-test.c libsphinx.$(SOEXT)
-	$(CC) $(CFLAGS) -o tests/pake$(EXT) tests/pake-test.c -lsphinx $(LDFLAGS) $(objs)
+	$(CC) $(CFLAGS) -o tests/pake$(EXT) tests/pake-test.c -L. -lsphinx $(LDFLAGS) $(objs)
 
 win/libsodium-win64:
 	@echo 'win/libsodium-win64 not found.'
