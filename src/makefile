@@ -10,13 +10,13 @@ objs=goldilocks/build/obj/curve25519/decaf.o \
 PREFIX?=/usr/local
 INC=-Igoldilocks/src/GENERATED/include -I/usr/include/sodium
 LIBS=-lsodium
-CFLAGS=$(INC) -Wall -Os
+CFLAGS=$(INC) -Wall -fPIC -fPIE -O3
 LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
 
 all: bin libsphinx.so tests
-bin: bin/challenge bin/respond bin/derive
+bin: bin/challenge bin/respond bin/derive bin/2pass
 
 win: CC=x86_64-w64-mingw32-gcc
 win: INC=-Igoldilocks/src/GENERATED/include -Iwin/libsodium-win64/include/sodium -Iwin/libsodium-win64/include
@@ -40,6 +40,9 @@ bin/respond$(EXT): $(objs) bin/respond.c
 
 bin/derive$(EXT): $(objs) bin/derive.c
 	$(CC) $(CFLAGS) -o bin/derive$(EXT) bin/derive.c $(LDFLAGS) $(objs)
+
+bin/2pass$(EXT): $(objs) bin/2pass.c
+	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS) $(objs)
 
 libsphinx.$(SOEXT): $(objs) sphinx.o pake.o
 	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $(objs) pake.o sphinx.o $(LDFLAGS)
