@@ -212,7 +212,7 @@ the previous server `srvSession()` function as well as the `sec` value
 from running the `usrSession()` function that initiated this protocol,
 the user password `pw` is also needed as an input to this final
 step. All these input parameters are transformed into a shared/secret
-session key `sk`, which should be the same as the one calculated by
+session key `pk`, which should be the same as the one calculated by
 the `srvSession()` function.
 
 #### Alternative registration API
@@ -264,6 +264,25 @@ creating the final record, which should be the same as the output of
 the 1-step `storePwdFile()` init function of the paper. The server
 should save this record in combination with a user id and/or `sid`
 value as suggested in the paper.
+
+```
+void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *res);
+```
+
+This is a simple utility function that can be used to calculate
+`f_k(c)`, where `c` is a constant, this is useful if the peers want to
+authenticate each other.
+
+If the server wants to authenticate itself to the user it sends the
+user the output `auth` of `opaque_f(sk,sizeof sk, 1, auth)`, where
+`sk` is the output from `srvSession()`. The user then verifies if this
+`auth` is the same as the result of `opaque_f(pk,sizeof pk, 1, auth2)`,
+where `pk` is the result from `userSessionEnd()`.
+
+For the other direction, user authenticating to the server, reverse
+the operations and use the value 2 for `c` instead of 1:
+`opaque_f(pk,sizeof pk, 2, auth)` ->  `opaque_f(sk,sizeof sk, 2, auth2)`
+and make sure `auth==auth2`.
 
 ## Standalone Binaries
 
