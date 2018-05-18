@@ -10,7 +10,7 @@ objs=goldilocks/build/obj/curve25519/decaf.o \
 PREFIX?=/usr/local
 INC=-Igoldilocks/src/GENERATED/include -I/usr/include/sodium
 LIBS=-lsodium
-CFLAGS=$(INC) -Wall -fPIC -fPIE -O3
+CFLAGS=$(INC) -Wall -fPIC -fPIE -O3 -g
 LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
@@ -27,7 +27,7 @@ win: MAKETARGET=win
 win: win/libsodium-win64 exe libsphinx.$(SOEXT) tests$(EXT)
 exe: bin/challenge$(EXT) bin/respond$(EXT) bin/derive$(EXT)
 
-tests$(EXT): tests/pake$(EXT) tests/sphinx$(EXT)
+tests$(EXT): tests/pake$(EXT) tests/sphinx$(EXT) tests/opaque$(EXT)
 
 $(objs):
 	cd goldilocks; OFLAGS='' ARCHFLAGS='' make $(MAKETARGET)
@@ -44,14 +44,17 @@ bin/derive$(EXT): $(objs) bin/derive.c
 bin/2pass$(EXT): $(objs) bin/2pass.c
 	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS) $(objs)
 
-libsphinx.$(SOEXT): $(objs) sphinx.o pake.o
-	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $(objs) pake.o sphinx.o $(LDFLAGS)
+libsphinx.$(SOEXT): $(objs) sphinx.o pake.o opaque.o
+	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $(objs) sphinx.o pake.o opaque.o $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -L. -lsphinx $(LDFLAGS) $(objs)
 
 tests/pake$(EXT): tests/pake-test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/pake$(EXT) tests/pake-test.c -L. -lsphinx $(LDFLAGS) $(objs)
+
+tests/opaque$(EXT): tests/opaque-test.c libsphinx.$(SOEXT)
+	$(CC) $(CFLAGS) -o tests/opaque$(EXT) tests/opaque-test.c -L. -lsphinx $(LDFLAGS) $(objs)
 
 win/libsodium-win64:
 	@echo 'win/libsodium-win64 not found.'
@@ -69,7 +72,7 @@ $(PREFIX)/include/sphinx.h: sphinx.h
 
 clean:
 	rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so
-	rm -f tests/sphinx tests/pake tests/sphinx.exe tests/pake.exe *.o
+	rm -f tests/sphinx tests/pake tests/opaque tests/sphinx.exe tests/pake.exe tests/opaque.exe *.o
 	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
 .PHONY: bin clean install
