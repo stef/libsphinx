@@ -7,6 +7,11 @@ https://eprint.iacr.org/2015/1099
 and as presented by the Levchin Prize winner 2018 Hugo Krawczyk on
 Real World Crypto https://www.youtube.com/watch?v=px8hiyf81iM
 
+it also implements:
+
+  - the PKI-free PAKE protocol as specified on page 18 of the same publication
+  - The OPAQUE protocol as specified on page 28 of: https://eprint.iacr.org/2018/163
+
 ## What is this thing?
 
 It allows you to have only a few (at least one) passwords that you
@@ -56,11 +61,12 @@ own password manager either in C/C++ or any other language that can
 bind to this library. The library also contains an experimental
 version of the PKI-free PAKE protocol from page 18 of the paper.
 
+### The Sphinx API
 The Library exposes the following 3 functions for the FK-PTR protocol
 (the password storage):
 
 ```
-void challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *chal);
+void sphinx_challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *chal);
 ```
  * pwd, p_len: are input params, containing the master password and its length
  * bfac: is an output param, it's a pointer to an array of
@@ -69,7 +75,7 @@ void challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *c
    `DECAF_255_SER_BYTES` (32) bytes - the challenge
 
 ```
-int respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp);
+int sphinx_respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp);
 ```
  * chal: is an input param, it is the challenge from the challenge()
    function, it has to be a `DECAF_255_SER_BYTES` (32) bytes big array
@@ -80,7 +86,7 @@ int respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp);
  * the function returns 1 on error, 0 on success
 
 ```
-int finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd);
+int sphinx_finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd);
 ```
 
  * bfac: is an input param, it is the bfac output from challenge(),
@@ -91,12 +97,14 @@ int finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd);
    `DECAF_255_SER_BYTES` (32) byte array
  * this function returns 1 on error, 0 on success
 
+### The PKI-free PAKE API
+
 The following functions implement the PKI-free PAKE protocol, (for the
 explanation of the various parameters please see the original paper
-and the pake-test.c example file):
+and the `src/tests/pake-test.c` example file):
 
 ```
-void server_init(uint8_t *p_s, uint8_t *P_s);
+void pake_server_init(uint8_t *p_s, uint8_t *P_s);
 ```
 
 This function is called when setting up a new server. It creates a
@@ -105,10 +113,10 @@ clients, the secret key needs to be well protected and persisted for
 later usage.
 
 ```
-void client_init(const uint8_t *rwd, const size_t rwd_len,
-                 const uint8_t *P_s,
-                 uint8_t k_s[32], uint8_t c[32],
-                 uint8_t C[32], uint8_t P_u[32], uint8_t m_u[32]);
+void pake_client_init(const uint8_t *rwd, const size_t rwd_len,
+                      const uint8_t *P_s,
+                      uint8_t k_s[32], uint8_t c[32],
+                      uint8_t C[32], uint8_t P_u[32], uint8_t m_u[32]);
 ```
 
 This function needs to be run on the client when registering at a
@@ -116,19 +124,19 @@ server. The output parameters need to be sent to the server.
 
 
 ```
-void start_pake(const uint8_t *rwd, const size_t rwd_len,
-                uint8_t alpha[32], uint8_t x_u[32],
-                uint8_t X_u[32], uint8_t sp[32]);
+void pake_start_pake(const uint8_t *rwd, const size_t rwd_len,
+                     uint8_t alpha[32], uint8_t x_u[32],
+                     uint8_t X_u[32], uint8_t sp[32]);
 ```
 
 The client initiates a "login" to the server with this function.
 
 ```
-int server_pake(const uint8_t alpha[32], const uint8_t X_u[32],  // input params
-                const uint8_t k_s[32], const uint8_t P_u[32],
-                const uint8_t p_s[32],
-                uint8_t beta[32], uint8_t X_s[32],               // output params
-                uint8_t SK[DECAF_X25519_PUBLIC_BYTES]);
+int pake_server_pake(const uint8_t alpha[32], const uint8_t X_u[32],  // input params
+                     const uint8_t k_s[32], const uint8_t P_u[32],
+                     const uint8_t p_s[32],
+                     uint8_t beta[32], uint8_t X_s[32],               // output params
+                     uint8_t SK[DECAF_X25519_PUBLIC_BYTES]);
 ```
 
 This function implements the "login" on the server, it reuses the data
@@ -138,22 +146,132 @@ successful completion SK should be a shared secret with the client. On
 error the function return 1, otherwise 0.
 
 ```
-int user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
-              const uint8_t x_u[32], const uint8_t beta[32], const uint8_t c[32],
-              const uint8_t C[32], const uint8_t P_u[32], const uint8_t m_u[32],
-              const uint8_t P_s[32], const uint8_t X_s[32],
-              uint8_t SK[DECAF_X25519_PUBLIC_BYTES]);
+int pake_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
+                   const uint8_t x_u[32], const uint8_t beta[32], const uint8_t c[32],
+                   const uint8_t C[32], const uint8_t P_u[32], const uint8_t m_u[32],
+                   const uint8_t P_s[32], const uint8_t X_s[32],
+                   uint8_t SK[DECAF_X25519_PUBLIC_BYTES]);
 ```
 
 This function finalizes the "login" on the client side. At successful
 completion SK should be a shared secret with the server. On error the
 function return 1, otherwise 0.
 
+### OPAQUE API
+
+The following functions implement the OPAQUE protocol with the following deviations:
+
+ 0. does not implement any persistence/lookup functionality.
+ 1. instead of HMQV it implements a Triple-DH instead - TODO/FIXME
+ 2. it implements "user iterated hashing" from page 29 of the paper
+ 3. additionally implements a variant where U secrets never hit S unprotected
+
+For more information please see the original paper and the
+`src/tests/opaque-test.c` example file.
+
+```
+int storePwdFile(const uint8_t *pw, Opaque_UserRecord *rec);
+```
+
+This function implements the same function from the paper. This
+function runs on the server and creates a new output record `rec` of
+secret key material partly encrypted with a key derived from the input
+password `pw`. The server needs to implement the storage of this
+record and any binding to user names or as the paper suggests `sid`.
+
+```
+void usrSession(const uint8_t *pw, Opaque_UserSession_Secret *sec, Opaque_UserSession *pub);
+```
+
+This function initiates a new OPAQUE session, is the same as the
+function defined in the paper with the same name. The User initiates a
+new session by providing its input password `pw`, and receving a
+private `sec` and a "public" `pub` output parameter. The User should
+protect the `sec` value until later in the protocol and send the `pub`
+value over to the Server, which process this with the following function:
+
+```
+int srvSession(const Opaque_UserSession *pub, const Opaque_UserRecord *rec, Opaque_ServerSession *resp, uint8_t *sk);
+```
+
+This is the same function as defined in the paper with the same
+name. It runs on the server and receives the output `pub` from the
+user running `usrSession()`, futhermore the server needs to load the
+user record created when registering the user with the `storePwdFile()`
+function. These input parameters are transformed into a secret/shared
+session key `sk` and a response `resp` to be sent back to the user to
+finish the protocol with the following `userSessionEnd()` function:
+
+```
+int userSessionEnd(const Opaque_ServerSession *resp, const Opaque_UserSession_Secret *sec, const uint8_t *pw, uint8_t *pk);
+```
+
+This is the same function as defined in the paper with the same
+name. It is run by the user, and recieves as input the response from
+the previous server `srvSession()` function as well as the `sec` value
+from running the `usrSession()` function that initiated this protocol,
+the user password `pw` is also needed as an input to this final
+step. All these input parameters are transformed into a shared/secret
+session key `sk`, which should be the same as the one calculated by
+the `srvSession()` function.
+
+#### Alternative registration API
+
+The paper original proposes a very simple 1 shot interface for
+registering a new "user", however this has the drawback that in that
+case the users secrets and its password are exposed in cleartext at
+registration to the server. There is a much less efficient 4 message
+registration protocol which avoids the exposure of the secrets and the
+password to the server which can be instantiated by the following for
+registration functions:
+
+```
+void newUser(const uint8_t *pw, uint8_t *r, uint8_t *alpha);
+```
+
+The user inputs its password `pw`, and receives an ephemeral secret
+`r` and a blinded value `alpha` as output. `r` should be protected
+until step 3 of this registration protocol and the value `alpha`
+should be passed to the servers `initUser()` function:
+
+```
+int initUser(const uint8_t *alpha, Opaque_RegisterSec *sec, Opaque_RegisterPub *pub);
+```
+
+The server receives `alpha` from the users invocation of its
+`newUser()` function, it outputs a value `sec` which needs to be
+protected until step 4 by the server. This function also outputs a
+value `pub` which needs to be passed to the user who will use it in
+its `registerUser()` function:
+
+```
+int registerUser(const uint8_t *pw, const uint8_t *r, const Opaque_RegisterPub *pub, Opaque_UserRecord *rec);
+```
+
+This function is run by the user, taking as input the users password
+`pw`, the ephemeral secret `r` that was an output of the user running
+`newUser()`, and the output `pub` from the servers run of
+`initUser()`. The result of this is the value `rec` which should be
+passed for the last step to the servers `saveUser()` function:
+
+```
+void saveUser(const Opaque_RegisterSec *sec, const Opaque_RegisterPub *pub, Opaque_UserRecord *rec);
+```
+
+The server combines the `sec` value from its run of its `initUser()`
+function with the `rec` output of the users `registerUser()` function,
+creating the final record, which should be the same as the output of
+the 1-step `storePwdFile()` init function of the paper. The server
+should save this record in combination with a user id and/or `sid`
+value as suggested in the paper.
+
 ## Standalone Binaries
 
-libsphinx comes with very simple binaries, so you can build
-your own password storage even from shell scripts. Each step in the
-protocol is handled by one binary:
+libsphinx comes with very simple binaries implementing the sphinx
+protocol, so you can build your own password storage even from shell
+scripts. There are no such binaries provided for the PKI-free PAKE nor
+the OPAQUE protocols. Each step in the SPHINX protocol is handled by
+one binary:
 
 ### step 1 - challenge
 The following creates a challenge for a device:
