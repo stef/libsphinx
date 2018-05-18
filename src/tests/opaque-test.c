@@ -29,24 +29,20 @@ static void dump(const uint8_t *p, const size_t len, const char* msg) {
 }
 
 int main(void) {
-  uint8_t U[]="user1",
-    S[]="server",
-    pw[]="simple guessable dictionary password",
-    sid[]="user1",
-    ssid[]="user1session0";
+  uint8_t pw[]="simple guessable dictionary password";
   Opaque_UserRecord rec;
 
   // register user
-  if(0!=storePwdFile(sid, U, pw, &rec)) return 1;
+  if(0!=storePwdFile(pw, &rec)) return 1;
 
   // initiate login
   Opaque_UserSession_Secret sec;
   Opaque_UserSession pub;
-  usrSession(sid, ssid, pw, &sec, &pub);
+  usrSession(pw, &sec, &pub);
 
   Opaque_ServerSession resp;
   uint8_t sk[32];
-  if(0!=srvSession(U, S, &pub, &rec, &resp, sk)) return 1;
+  if(0!=srvSession(&pub, &rec, &resp, sk)) return 1;
 
   dump(sk,32,"sk_s: ");
 
@@ -54,6 +50,29 @@ int main(void) {
   if(0!=userSessionEnd(&resp, &sec, pw, pk)) return 1;
 
   dump(pk,32,"sk_u: ");
+  if(memcmp(sk,pk,sizeof sk)!=0) return 1;
+
+  // variant where user registration does not leak secrets to server
+  uint8_t alpha[DECAF_X25519_PUBLIC_BYTES];
+  uint8_t r[DECAF_X25519_PRIVATE_BYTES];
+  // user initiates:
+  newUser(pw, r, alpha);
+  // server responds
+  Opaque_RegisterSec rsec;
+  Opaque_RegisterPub rpub;
+  if(0!=initUser(alpha, &rsec, &rpub)) return 1;
+  // user commits its secrets
+  Opaque_UserRecord rrec;
+  if(0!=registerUser(pw, r, &rpub, &rrec)) return 1;
+  // server "saves"
+  saveUser(&rsec, &rpub, &rrec);
+
+  usrSession(pw, &sec, &pub);
+  if(0!=srvSession(&pub, &rec, &resp, sk)) return 1;
+  dump(sk,32,"sk_s: ");
+  if(0!=userSessionEnd(&resp, &sec, pw, pk)) return 1;
+  dump(pk,32,"sk_u: ");
+  if(memcmp(sk,pk,sizeof sk)!=0) return 1;
 
   return 0;
 }

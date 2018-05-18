@@ -20,8 +20,7 @@
     with following deviations:
        1/ instead of HMQV it implements a Triple-DH instead - TODO/FIXME
        2/ it implements "user iterated hashing" from page 29 of the paper
-
-    it probably makes sense to include S,U in as authenticated data in C
+       3/ implements a variant where U secrets never hit S unprotected
 */
 
 #include <stdint.h>
@@ -66,9 +65,9 @@ static void oprf(const uint8_t *x, const size_t x_len, const uint8_t *k, uint8_t
 }
 
 // (StorePwdFile, sid , U, pw): S computes k_s ←_R Z_q , rw := F_k_s (pw),
-// p+s ←_R Z_q , p_u ←_R Z_q , P_s := g^p_s , P_u := g^p_u , c ← AuthEnc_rw (p_u, P_u, P_s);
+// p_s ←_R Z_q , p_u ←_R Z_q , P_s := g^p_s , P_u := g^p_u , c ← AuthEnc_rw (p_u, P_u, P_s);
 // it records file[sid ] := {k_s, p_s, P_s, P_u, c}.
-int storePwdFile(const uint8_t *sid, const uint8_t *U, const uint8_t *pw, Opaque_UserRecord *rec) {
+int storePwdFile(const uint8_t *pw, Opaque_UserRecord *rec) {
   // k_s ←_R Z_q
   randombytes(rec->k_s, 32);
 
@@ -112,14 +111,9 @@ int storePwdFile(const uint8_t *sid, const uint8_t *U, const uint8_t *pw, Opaque
   return 0;
 }
 
-//(UsrSession, sid , ssid , S, pw): U picks r, x_u ←_R Z_q ; sets α := (H^0(pw))^r and
-//X_u := g^x_u ; sends α and X_u to S.
-void usrSession(const uint8_t *sid, const uint8_t *ssid, const uint8_t *pw, Opaque_UserSession_Secret *sec, Opaque_UserSession *pub) {
+static void blindPW(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
   // U picks r
-  randombytes(sec->r, DECAF_X25519_PRIVATE_BYTES);
-
-  // x_u ←_R Z_q
-  randombytes(sec->x_u, DECAF_X25519_PRIVATE_BYTES);
+  randombytes(r, DECAF_X25519_PRIVATE_BYTES);
 
   // sets α := (H^0(pw))^r
   uint8_t h0[32];
@@ -127,12 +121,21 @@ void usrSession(const uint8_t *sid, const uint8_t *ssid, const uint8_t *pw, Opaq
   decaf_255_point_t H0;
   decaf_255_point_from_hash_nonuniform(H0, h0);
   decaf_bzero(h0, sizeof(h0));
-  decaf_255_scalar_t r;
-  decaf_255_scalar_decode_long(r, sec->r, 32);
-  decaf_255_point_scalarmul(H0, H0, r);
-  decaf_255_scalar_destroy(r);
-  decaf_255_point_encode(pub->alpha, H0);
+  decaf_255_scalar_t R;
+  decaf_255_scalar_decode_long(R, r, 32);
+  decaf_255_point_scalarmul(H0, H0, R);
+  decaf_255_scalar_destroy(R);
+  decaf_255_point_encode(alpha, H0);
   decaf_255_point_destroy(H0);
+}
+
+//(UsrSession, sid , ssid , S, pw): U picks r, x_u ←_R Z_q ; sets α := (H^0(pw))^r and
+//X_u := g^x_u ; sends α and X_u to S.
+void usrSession(const uint8_t *pw, Opaque_UserSession_Secret *sec, Opaque_UserSession *pub) {
+  blindPW(pw, sec->r, pub->alpha);
+
+  // x_u ←_R Z_q
+  randombytes(sec->x_u, DECAF_X25519_PRIVATE_BYTES);
 
   // X_u := g^x_u
   decaf_x25519_derive_public_key(pub->X_u, sec->x_u);
@@ -177,7 +180,7 @@ static int server_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], c
 // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f K (0);
 // (e) Sends β, X s and c to U;
 // (f) Outputs (sid , ssid , SK).
-int srvSession(const uint8_t *U, const uint8_t *S, const Opaque_UserSession *pub, const Opaque_UserRecord *rec, Opaque_ServerSession *resp, uint8_t *sk) {
+int srvSession(const Opaque_UserSession *pub, const Opaque_UserRecord *rec, Opaque_ServerSession *resp, uint8_t *sk) {
   decaf_255_point_t Alpha;
   // (a) Checks that α ∈ G^∗ . If not, outputs (abort, sid , ssid ) and halts;
   if(DECAF_SUCCESS!=decaf_255_point_decode(Alpha, pub->alpha, DECAF_FALSE)) return 1;
@@ -300,4 +303,122 @@ int userSessionEnd(const Opaque_ServerSession *resp, const Opaque_UserSession_Se
   // (e) Outputs (sid, ssid, SK).
 
   return 0;
+}
+
+// variant where the secrets of U never touch S unencrypted
+
+// U computes: blinded PW
+void newUser(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
+  blindPW(pw, r, alpha);
+}
+
+// initUser: S
+// (1) checks α ∈ G^∗ If not, outputs (abort, sid , ssid ) and halts;
+// (2) generates k_s ←_R Z_q,
+// (3) computes: β := α^k_s,
+// (4) finally generates: p_s ←_R Z_q, P_s := g^p_s;
+int initUser(const uint8_t *alpha, Opaque_RegisterSec *sec, Opaque_RegisterPub *pub) {
+  decaf_255_point_t Alpha;
+  // (a) Checks that α ∈ G^∗ . If not, outputs (abort, sid , ssid ) and halts;
+  if(DECAF_SUCCESS!=decaf_255_point_decode(Alpha, alpha, DECAF_FALSE)) return 1;
+
+  // k_s ←_R Z_q
+  randombytes(sec->k_s, DECAF_X25519_PRIVATE_BYTES);  // random server user key */
+
+  // computes β := α^k_s
+  decaf_255_point_t Beta;
+  decaf_255_scalar_t K_s;
+  decaf_255_scalar_decode_long(K_s, sec->k_s, 32);
+  decaf_255_point_scalarmul(Beta, Alpha, K_s);
+  decaf_255_point_destroy(Alpha);
+  decaf_255_scalar_destroy(K_s);
+  decaf_255_point_encode(pub->beta, Beta);
+  decaf_255_point_destroy(Beta);
+
+  // p_s ←_R Z_q
+  randombytes(sec->p_s, DECAF_X25519_PRIVATE_BYTES); // random server long-term key */
+
+  // P_s := g^p_s
+  decaf_x25519_derive_public_key(pub->P_s, sec->p_s);
+
+  return 0;
+}
+
+// user computes:
+// (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
+// (b) Computes rw := H(pw, β^1/r );
+// (c) generates salt
+// (c) p_u ←_R Z_q
+// (d) P_u := g^p_u,
+// (e) c ← AuthEnc_rw (p_u, P_u, P_s);
+int registerUser(const uint8_t *pw, const uint8_t *r, const Opaque_RegisterPub *pub, Opaque_UserRecord *rec) {
+  // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
+  decaf_255_point_t Beta;
+  if(DECAF_SUCCESS!=decaf_255_point_decode(Beta, pub->beta, DECAF_FALSE)) return 1;
+
+  // (b) Computes rw := H(pw, β^1/r );
+  decaf_255_scalar_t R;
+  decaf_255_scalar_decode_long(R, r, 32);
+  // r = 1/r
+  if(decaf_255_scalar_invert(R, R)!=DECAF_SUCCESS) return 1;
+
+  // H0 = β^(1/r)
+  decaf_255_point_t H0;
+  decaf_255_point_scalarmul(H0, Beta, R);
+  decaf_255_scalar_destroy(R);
+  decaf_255_point_destroy(Beta);
+  uint8_t h0[32], rw[32];
+  decaf_255_point_encode(h0, H0);
+  decaf_255_point_destroy(H0);
+
+  // rw = H(pw, β^(1/r))
+  crypto_generichash_state state;
+  crypto_generichash_init(&state, 0, 0, 32);
+  crypto_generichash_update(&state, pw, strlen((char*) pw));
+  crypto_generichash_update(&state, h0, 32);
+  crypto_generichash_final(&state, rw, 32);
+  decaf_bzero(h0, sizeof(h0));
+  decaf_bzero(&state, sizeof(state));
+
+  // generate salt
+  randombytes(rec->salt, sizeof(rec->salt));
+
+  if (crypto_pwhash(rw, sizeof rw, (const char*) rw, sizeof rw, rec->salt,
+       crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE,
+       crypto_pwhash_ALG_DEFAULT) != 0) {
+    /* out of memory */
+    return 1;
+  }
+
+  // p_u ←_R Z_q
+  randombytes(rec->c.p_u, DECAF_X25519_PRIVATE_BYTES); // random user secret key */
+
+  // P_u := g^p_u
+  decaf_x25519_derive_public_key(rec->c.P_u, rec->c.p_u);
+
+  // copy P_u also into plaintext rec */
+  memcpy(rec->P_u, rec->c.P_u,DECAF_X25519_PUBLIC_BYTES);
+
+  // copy P_s into rec.c
+  memcpy(rec->c.P_s, pub->P_s,DECAF_X25519_PUBLIC_BYTES);
+
+  // c ← AuthEnc_rw(p_u,P_u,P_s);
+  randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                        // nonce for crypto_secretbox
+
+  crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,         // ciphertext
+                        ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,         // plaintext
+                        DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2,  // plaintext len
+                        ((uint8_t*)&rec->c),                                     // nonce
+                        rw);                                                     // key
+
+  decaf_bzero(rw, sizeof(rw));
+
+  return 0;
+}
+
+// S records file[sid ] := {k_s, p_s, P_s, P_u, c}.
+void saveUser(const Opaque_RegisterSec *sec, const Opaque_RegisterPub *pub, Opaque_UserRecord *rec) {
+  memcpy(rec->k_s, sec->k_s, sizeof rec->k_s);
+  memcpy(rec->p_s, sec->p_s, sizeof rec->p_s);
+  memcpy(rec->P_s, pub->P_s, sizeof rec->P_s);
 }
