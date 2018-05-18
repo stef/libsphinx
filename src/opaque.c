@@ -64,6 +64,7 @@ static void oprf(const uint8_t *x, const size_t x_len, const uint8_t *k, uint8_t
   decaf_bzero(h0, sizeof(h0));
 }
 
+// for the super-paranoid: use opaque_oprf() instead of this function for more heating
 void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *res) {
   // hash for the result res = f_k(val)
   uint8_t v[32];
