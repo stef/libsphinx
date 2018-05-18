@@ -64,10 +64,19 @@ static void oprf(const uint8_t *x, const size_t x_len, const uint8_t *k, uint8_t
   decaf_bzero(h0, sizeof(h0));
 }
 
+void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *res) {
+  // hash for the result res = f_k(val)
+  uint8_t v[32];
+  memset(v,val,32);
+  crypto_generichash(res, DECAF_X25519_PUBLIC_BYTES,  // output
+                     v, sizeof v,                     // msg
+                     k, 32);                          // key
+}
+
 // (StorePwdFile, sid , U, pw): S computes k_s ←_R Z_q , rw := F_k_s (pw),
 // p_s ←_R Z_q , p_u ←_R Z_q , P_s := g^p_s , P_u := g^p_u , c ← AuthEnc_rw (p_u, P_u, P_s);
 // it records file[sid ] := {k_s, p_s, P_s, P_u, c}.
-int storePwdFile(const uint8_t *pw, Opaque_UserRecord *rec) {
+int opaque_storePwdFile(const uint8_t *pw, Opaque_UserRecord *rec) {
   // k_s ←_R Z_q
   randombytes(rec->k_s, 32);
 
@@ -131,7 +140,7 @@ static void blindPW(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
 
 //(UsrSession, sid , ssid , S, pw): U picks r, x_u ←_R Z_q ; sets α := (H^0(pw))^r and
 //X_u := g^x_u ; sends α and X_u to S.
-void usrSession(const uint8_t *pw, Opaque_UserSession_Secret *sec, Opaque_UserSession *pub) {
+void opaque_usrSession(const uint8_t *pw, Opaque_UserSession_Secret *sec, Opaque_UserSession *pub) {
   blindPW(pw, sec->r, pub->alpha);
 
   // x_u ←_R Z_q
@@ -148,11 +157,7 @@ static void derive_secret(uint8_t *mk, const uint8_t *sec) {
   crypto_generichash(hashkey, sizeof hashkey, sec, 96, 0, 0);
 
   // and hash for the result SK = f_K(0)
-  uint8_t zero[32];
-  memset(zero,0,32);
-  crypto_generichash(mk, DECAF_X25519_PUBLIC_BYTES,  // output
-                     zero, 32,                       // msg
-                     hashkey, sizeof(hashkey));      // key
+  opaque_f(hashkey, sizeof hashkey, 0, mk);
 
   decaf_bzero(hashkey, sizeof(hashkey));
 }
@@ -180,7 +185,7 @@ static int server_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], c
 // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f K (0);
 // (e) Sends β, X s and c to U;
 // (f) Outputs (sid , ssid , SK).
-int srvSession(const Opaque_UserSession *pub, const Opaque_UserRecord *rec, Opaque_ServerSession *resp, uint8_t *sk) {
+int opaque_srvSession(const Opaque_UserSession *pub, const Opaque_UserRecord *rec, Opaque_ServerSession *resp, uint8_t *sk) {
   decaf_255_point_t Alpha;
   // (a) Checks that α ∈ G^∗ . If not, outputs (abort, sid , ssid ) and halts;
   if(DECAF_SUCCESS!=decaf_255_point_decode(Alpha, pub->alpha, DECAF_FALSE)) return 1;
@@ -243,7 +248,7 @@ static int user_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], con
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int userSessionEnd(const Opaque_ServerSession *resp, const Opaque_UserSession_Secret *sec, const uint8_t *pw, uint8_t *sk) {
+int opaque_userSessionEnd(const Opaque_ServerSession *resp, const Opaque_UserSession_Secret *sec, const uint8_t *pw, uint8_t *sk) {
   // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
   decaf_255_point_t Beta;
   if(DECAF_SUCCESS!=decaf_255_point_decode(Beta, resp->beta, DECAF_FALSE)) return 1;
@@ -308,7 +313,7 @@ int userSessionEnd(const Opaque_ServerSession *resp, const Opaque_UserSession_Se
 // variant where the secrets of U never touch S unencrypted
 
 // U computes: blinded PW
-void newUser(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
+void opaque_newUser(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
   blindPW(pw, r, alpha);
 }
 
@@ -317,7 +322,7 @@ void newUser(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
 // (2) generates k_s ←_R Z_q,
 // (3) computes: β := α^k_s,
 // (4) finally generates: p_s ←_R Z_q, P_s := g^p_s;
-int initUser(const uint8_t *alpha, Opaque_RegisterSec *sec, Opaque_RegisterPub *pub) {
+int opaque_initUser(const uint8_t *alpha, Opaque_RegisterSec *sec, Opaque_RegisterPub *pub) {
   decaf_255_point_t Alpha;
   // (a) Checks that α ∈ G^∗ . If not, outputs (abort, sid , ssid ) and halts;
   if(DECAF_SUCCESS!=decaf_255_point_decode(Alpha, alpha, DECAF_FALSE)) return 1;
@@ -351,7 +356,7 @@ int initUser(const uint8_t *alpha, Opaque_RegisterSec *sec, Opaque_RegisterPub *
 // (c) p_u ←_R Z_q
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
-int registerUser(const uint8_t *pw, const uint8_t *r, const Opaque_RegisterPub *pub, Opaque_UserRecord *rec) {
+int opaque_registerUser(const uint8_t *pw, const uint8_t *r, const Opaque_RegisterPub *pub, Opaque_UserRecord *rec) {
   // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
   decaf_255_point_t Beta;
   if(DECAF_SUCCESS!=decaf_255_point_decode(Beta, pub->beta, DECAF_FALSE)) return 1;
@@ -417,7 +422,7 @@ int registerUser(const uint8_t *pw, const uint8_t *r, const Opaque_RegisterPub *
 }
 
 // S records file[sid ] := {k_s, p_s, P_s, P_u, c}.
-void saveUser(const Opaque_RegisterSec *sec, const Opaque_RegisterPub *pub, Opaque_UserRecord *rec) {
+void opaque_saveUser(const Opaque_RegisterSec *sec, const Opaque_RegisterPub *pub, Opaque_UserRecord *rec) {
   memcpy(rec->k_s, sec->k_s, sizeof rec->k_s);
   memcpy(rec->p_s, sec->p_s, sizeof rec->p_s);
   memcpy(rec->P_s, pub->P_s, sizeof rec->P_s);
