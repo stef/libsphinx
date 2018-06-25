@@ -48,8 +48,7 @@ package management.
 Building everything should (hopefully) be quite simple afterwards:
 
 ```
-git submodule init
-git submodule update --recursive --remote
+git submodule update --init --recursive --remote
 cd src
 make
 ```
