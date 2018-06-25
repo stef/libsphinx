@@ -42,7 +42,7 @@ it's unique and cannot be used to login to other sites or services.
 
 ## Installing
 
-Install `libsodium`  and `libsodium-dev` using your operating system provided
+Install `python`, `libsodium`  and `libsodium-dev` using your operating system provided
 package management. 
 
 Building everything should (hopefully) be quite simple afterwards:
