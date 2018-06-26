@@ -69,19 +69,19 @@ void sphinx_challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uin
 ```
  * pwd, p_len: are input params, containing the master password and its length
  * bfac: is an output param, it's a pointer to an array of
-   `DECAF_255_SCALAR_BYTES` (32) bytes - the blinding factor
+   `SPHINX_255_SCALAR_BYTES` (32) bytes - the blinding factor
  * chal: is an output param, it's a pointer to an array of
-   `DECAF_255_SER_BYTES` (32) bytes - the challenge
+   `SPHINX_255_SER_BYTES` (32) bytes - the challenge
 
 ```
 int sphinx_respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp);
 ```
  * chal: is an input param, it is the challenge from the challenge()
-   function, it has to be a `DECAF_255_SER_BYTES` (32) bytes big array
+   function, it has to be a `SPHINX_255_SER_BYTES` (32) bytes big array
  * secret: is an input param, it is the "secret" contribution from the
-   device, it is a `DECAF_255_SCALAR_BYTES` (32) bytes long array
+   device, it is a `SPHINX_255_SCALAR_BYTES` (32) bytes long array
  * resp: is an output parameter, it is the result of this step, it
-   must be a `DECAF_255_SER_BYTES` (32) byte sized array
+   must be a `SPHINX_255_SER_BYTES` (32) byte sized array
  * the function returns 1 on error, 0 on success
 
 ```
@@ -89,11 +89,11 @@ int sphinx_finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd);
 ```
 
  * bfac: is an input param, it is the bfac output from challenge(),
-   it is array of `DECAF_255_SCALAR_BYTES` (32) bytes
+   it is array of `SPHINX_255_SCALAR_BYTES` (32) bytes
  * resp: is an input parameter, it's the response from respond(), it
-   is a `DECAF_255_SER_BYTES` (32) byte sized array
+   is a `SPHINX_255_SER_BYTES` (32) byte sized array
  * rwd: is an output param, the derived (binary) password, it is a
-   `DECAF_255_SER_BYTES` (32) byte array
+   `SPHINX_255_SER_BYTES` (32) byte array
  * this function returns 1 on error, 0 on success
 
 ### The PKI-free PAKE API
