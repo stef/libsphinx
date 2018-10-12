@@ -85,9 +85,13 @@ int sphinx_respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp);
  * the function returns 1 on error, 0 on success
 
 ```
-int sphinx_finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd);
+int sphinx_finish(const uint8_t *pwd, const size_t p_len,
+                  const uint8_t *bfac, const uint8_t *resp,
+                  uint8_t *rwd);
 ```
 
+ * pwd: is an input param, it specifies the password again.
+ * p_len: is an input param, it specifies the password length
  * bfac: is an input param, it is the bfac output from challenge(),
    it is array of `SPHINX_255_SCALAR_BYTES` (32) bytes
  * resp: is an input parameter, it's the response from respond(), it
@@ -311,14 +315,17 @@ Pass the challenge from step 1 on standard input like:
 The response is sent to standard output.
 
 ### step 3 - derive password
-To derive a (currently hex) password, pass the response from step 2 on standard
-input and the filename of the tempfile from step 1 like:
+To derive a (currently hex) password, pass the response from step 2 on
+standard input and the filename of the tempfile from step 1 like:
+
 ```
-fname=$(cat b)
-./derive $fname <r0 >pwd0
+fname=$(cat b) ./derive $fname <r0 >pwd0
 ```
-The derived password is sent to standard output and currently is a 32 byte
-binary string.
+
+The derived password is sent to standard output and currently is a 32
+byte binary string. Please note that currently this only outputs the
+unblinded H(pwd)^k, for the full protocol this should be hashed again
+with the password prepended.
 
 ### step 4 - transform into ASCII password
 

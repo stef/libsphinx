@@ -64,13 +64,23 @@ int main(int argc, char **argv) {
   decaf_255_point_t R;
   if(DECAF_SUCCESS!=decaf_255_point_decode(R, resp, DECAF_FALSE)) return 1;
 
-  // unblind the response from the peer: Y1=R/x
+  // unblind the response from the peer: Y=R/x
   decaf_255_point_t Y;
   decaf_255_point_scalarmul(Y, R, b);
 
 
   unsigned char out[DECAF_255_SER_BYTES];
   decaf_255_point_encode(out, Y);
+
+  // todo implement the hashing of the unblinded Y
+  //crypto_generichash_state state;
+  //crypto_generichash_init(&state, 0, 0, 32);
+  //crypto_generichash_update(&state, pwd, p_len);
+  //crypto_generichash_update(&state, h0, SPHINX_255_SER_BYTES);
+  //crypto_generichash_final(&state, rwd, SPHINX_255_SER_BYTES);
+  //decaf_bzero(&state, sizeof(state));
+  //decaf_bzero(h0, sizeof(h0));
+
   // output the response
 
   int i;

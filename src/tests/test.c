@@ -14,11 +14,11 @@ int main(void) {
   if(0!=sphinx_respond(chal, secret, resp)) {
     return 1;
   }
-  if(0!=sphinx_finish(bfac, resp, rwd)) {
+  if(0!=sphinx_finish(pwd, sizeof pwd, bfac, resp, rwd)) {
     return 1;
   }
 
-  int i;
+  unsigned i;
   for(i=0;i<sizeof rwd;i++) {
     printf("%02x",rwd[i]);
   }

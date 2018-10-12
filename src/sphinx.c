@@ -19,6 +19,7 @@
 #include <decaf.h>
 #include <randombytes.h>
 #include <crypto_generichash.h>
+#include "sphinx.h"
 
 /* params:
  *
@@ -77,12 +78,14 @@ int sphinx_respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
 }
 
 /* params
+ * pwd: (input) the password
+ * p_len: (input) the password length
  * bfac: (input) bfac from challenge(), array of DECAF_255_SCALAR_BYTES (32) bytes
  * resp: (input) the response from respond(), DECAF_255_SER_BYTES (32) bytes array
  * rwd: (output) the derived password, DECAF_255_SER_BYTES (32) bytes array
  * returns 1 on error, 0 on success
  */
-int sphinx_finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
+int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
   // decode blinding factor into scalar
   decaf_255_scalar_t b;
   decaf_255_scalar_decode_long(b, bfac, DECAF_255_SCALAR_BYTES);
@@ -94,13 +97,23 @@ int sphinx_finish(const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
   decaf_255_point_t R;
   if(DECAF_SUCCESS!=decaf_255_point_decode(R, resp, DECAF_FALSE)) return 1;
 
-  // unblind the response from the peer: Y1=R/x
+  // unblind the response from the peer: Y=R/x
   decaf_255_point_t Y;
   decaf_255_point_scalarmul(Y, R, b);
   decaf_255_scalar_destroy(b);
   decaf_255_point_destroy(R);
 
-  decaf_255_point_encode(rwd, Y);
+  uint8_t h0[SPHINX_255_SER_BYTES];
+  decaf_255_point_encode(h0, Y);
   decaf_255_point_destroy(Y);
+
+  crypto_generichash_state state;
+  crypto_generichash_init(&state, 0, 0, 32);
+  crypto_generichash_update(&state, pwd, p_len);
+  crypto_generichash_update(&state, h0, SPHINX_255_SER_BYTES);
+  crypto_generichash_final(&state, rwd, SPHINX_255_SER_BYTES);
+  decaf_bzero(&state, sizeof(state));
+  decaf_bzero(h0, sizeof(h0));
+
   return 0;
 }
