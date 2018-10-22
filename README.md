@@ -165,7 +165,7 @@ function return 1, otherwise 0.
 The following functions implement the OPAQUE protocol with the following deviations:
 
  0. does not implement any persistence/lookup functionality.
- 1. instead of HMQV it implements a Triple-DH instead - TODO/FIXME
+ 1. instead of HMQV (which is patented) it implements a Triple-DH instead.
  2. it implements "user iterated hashing" from page 29 of the paper
  3. additionally implements a variant where U secrets never hit S unprotected
 
