@@ -10,7 +10,7 @@ Real World Crypto https://www.youtube.com/watch?v=px8hiyf81iM
 it also implements:
 
   - the PKI-free PAKE protocol as specified on page 18 of the same publication
-  - The OPAQUE protocol as specified on page 28 of: https://eprint.iacr.org/2018/163
+  - The OPAQUE protocol as specified on page 28 of: https://eprint.iacr.org/2018/163 - see also OPAQUE.md
 
 ## What is this thing?
 
