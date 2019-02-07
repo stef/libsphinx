@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sodium.h>
 #include "../opaque.h"
 
 static void dump(const uint8_t *p, const size_t len, const char* msg) {
@@ -50,7 +51,7 @@ int main(void) {
   if(0!=opaque_userSessionEnd(&resp, &sec, pw, pk)) return 1;
 
   dump(pk,32,"sk_u: ");
-  if(memcmp(sk,pk,sizeof sk)!=0) return 1;
+  if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
 
   // variant where user registration does not leak secrets to server
   uint8_t alpha[DECAF_X25519_PUBLIC_BYTES];
@@ -72,7 +73,7 @@ int main(void) {
   dump(sk,32,"sk_s: ");
   if(0!=opaque_userSessionEnd(&resp, &sec, pw, pk)) return 1;
   dump(pk,32,"sk_u: ");
-  if(memcmp(sk,pk,sizeof sk)!=0) return 1;
+  if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
 
   // authenticate both parties:
 
@@ -84,7 +85,7 @@ int main(void) {
   opaque_f(pk, sizeof pk, 1, us);
   dump(su, 32, "f_sk(1): ");
   dump(us, 32, "f_pk(1): ");
-  if(0!=memcmp(su,us,32)) return 1;
+  if(0!=sodium_memcmp(su,us,32)) return 1;
 
   // to authenticate the user to the server, the user sends f_pk(2)
   // to the server, which calculates f_sk(2) and verifies it's the same
@@ -93,7 +94,7 @@ int main(void) {
   opaque_f(sk, sizeof sk, 2, su);
   dump(us, 32, "f_pk(2): ");
   dump(su, 32, "f_sk(2): ");
-  if(0!=memcmp(su,us,32)) return 1;
+  if(0!=sodium_memcmp(su,us,32)) return 1;
 
   return 0;
 }
