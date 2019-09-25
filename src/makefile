@@ -27,6 +27,11 @@ win: MAKETARGET=win
 win: win/libsodium-win64 exe libsphinx.$(SOEXT) tests$(EXT)
 exe: bin/challenge$(EXT) bin/respond$(EXT) bin/derive$(EXT)
 
+android: INC=-Igoldilocks/src/GENERATED/include -I$(SODIUM) -I$(SODIUM)/sodium
+android: LIBS=-Wl,-Bstatic -Wl,-Bdynamic -lsodiumjni -L.
+android: EXTRA_OBJECTS=jni.o
+android: jni.o libsphinx.so
+
 tests$(EXT): tests/pake$(EXT) tests/sphinx$(EXT) tests/opaque$(EXT)
 
 $(objs):
@@ -44,8 +49,8 @@ bin/derive$(EXT): $(objs) bin/derive.c
 bin/2pass$(EXT): $(objs) bin/2pass.c
 	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS) $(objs)
 
-libsphinx.$(SOEXT): $(objs) sphinx.o pake.o opaque.o
-	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $(objs) sphinx.o pake.o opaque.o $(LDFLAGS)
+libsphinx.$(SOEXT): $(objs) sphinx.o pake.o opaque.o $(EXTRA_OBJECTS)
+	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $(objs) sphinx.o pake.o opaque.o $(EXTRA_OBJECTS) $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -L. -lsphinx $(LDFLAGS) $(objs)
