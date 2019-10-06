@@ -1,6 +1,6 @@
 # OPAQUE Parameters
 
-Currently all parameters are hardcode, but there's nothing stoping you
+Currently all parameters are hardcoded, but there's nothing stoping you
 and set stronger values for the password hash, or changing the curve
 from 25519 to 448 goldilocks.
 
