@@ -52,7 +52,7 @@ int main(void) {
 
   uint8_t pk[32];
   printf("usrSessionEnd\n");
-  if(0!=opaque_userSessionEnd(resp, sec, pw, pwlen, pk)) return 1;
+  if(0!=opaque_userSessionEnd(pw, pwlen, resp, sec, pk)) return 1;
 
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
@@ -81,7 +81,7 @@ int main(void) {
   if(0!=opaque_srvSession(pub, rec, resp, sk)) return 1;
   dump(sk,32,"sk_s: ");
   printf("userSessionEnd\n");
-  if(0!=opaque_userSessionEnd(resp, sec, pw, pwlen, pk)) return 1;
+  if(0!=opaque_userSessionEnd(pw, pwlen, resp, sec, pk)) return 1;
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
 

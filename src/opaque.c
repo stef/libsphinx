@@ -303,7 +303,7 @@ static int user_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], con
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int opaque_userSessionEnd(const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *pw, const ssize_t pwlen, uint8_t *sk) {
+int opaque_userSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
 
