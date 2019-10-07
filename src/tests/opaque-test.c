@@ -31,24 +31,23 @@ static void dump(const uint8_t *p, const size_t len, const char* msg) {
 
 int main(void) {
   uint8_t pw[]="simple guessable dictionary password";
-  Opaque_UserRecord rec;
+  unsigned char rec[OPAQUE_USER_RECORD_LEN];
 
   // register user
-  if(0!=opaque_storePwdFile(pw, &rec)) return 1;
+  if(0!=opaque_storePwdFile(pw, rec)) return 1;
 
   // initiate login
-  Opaque_UserSession_Secret sec;
-  Opaque_UserSession pub;
-  opaque_usrSession(pw, &sec, &pub);
+  unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
+  opaque_usrSession(pw, sec, pub);
 
-  Opaque_ServerSession resp;
+  unsigned char resp[OPAQUE_SERVER_SESSION_LEN];
   uint8_t sk[32];
-  if(0!=opaque_srvSession(&pub, &rec, &resp, sk)) return 1;
+  if(0!=opaque_srvSession(pub, rec, resp, sk)) return 1;
 
   dump(sk,32,"sk_s: ");
 
   uint8_t pk[32];
-  if(0!=opaque_userSessionEnd(&resp, &sec, pw, pk)) return 1;
+  if(0!=opaque_userSessionEnd(resp, sec, pw, pk)) return 1;
 
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
@@ -59,19 +58,18 @@ int main(void) {
   // user initiates:
   opaque_newUser(pw, r, alpha);
   // server responds
-  Opaque_RegisterSec rsec;
-  Opaque_RegisterPub rpub;
-  if(0!=opaque_initUser(alpha, &rsec, &rpub)) return 1;
+  unsigned char rsec[OPAQUE_REGISTER_SECRET_LEN], rpub[OPAQUE_REGISTER_PUBLIC_LEN];
+  if(0!=opaque_initUser(alpha, rsec, rpub)) return 1;
   // user commits its secrets
-  Opaque_UserRecord rrec;
-  if(0!=opaque_registerUser(pw, r, &rpub, &rrec)) return 1;
+  unsigned char rrec[OPAQUE_USER_RECORD_LEN];
+  if(0!=opaque_registerUser(pw, r, rpub, rrec)) return 1;
   // server "saves"
-  opaque_saveUser(&rsec, &rpub, &rrec);
+  opaque_saveUser(rsec, rpub, rrec);
 
-  opaque_usrSession(pw, &sec, &pub);
-  if(0!=opaque_srvSession(&pub, &rec, &resp, sk)) return 1;
+  opaque_usrSession(pw, sec, pub);
+  if(0!=opaque_srvSession(pub, rec, resp, sk)) return 1;
   dump(sk,32,"sk_s: ");
-  if(0!=opaque_userSessionEnd(&resp, &sec, pw, pk)) return 1;
+  if(0!=opaque_userSessionEnd(resp, sec, pw, pk)) return 1;
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
 
