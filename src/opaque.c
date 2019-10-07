@@ -78,7 +78,7 @@ typedef struct {
   uint8_t k_s[DECAF_X25519_PRIVATE_BYTES];
 } __attribute((packed)) Opaque_RegisterSec;
 
-static void oprf(const uint8_t *x, const size_t x_len, const uint8_t *k, uint8_t *res) {
+static void oprf(const uint8_t *x, const ssize_t x_len, const uint8_t *k, uint8_t *res) {
   // F_k(x) = H(x, (H0(x))^k) for key k ∈ Z_q
 
   // hash x with H0
@@ -122,7 +122,7 @@ void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *
 // (StorePwdFile, sid , U, pw): S computes k_s ←_R Z_q , rw := F_k_s (pw),
 // p_s ←_R Z_q , p_u ←_R Z_q , P_s := g^p_s , P_u := g^p_u , c ← AuthEnc_rw (p_u, P_u, P_s);
 // it records file[sid ] := {k_s, p_s, P_s, P_u, c}.
-int opaque_storePwdFile(const uint8_t *pw, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_UserRecord *rec = (Opaque_UserRecord *)_rec;
 
   // k_s ←_R Z_q
@@ -130,7 +130,7 @@ int opaque_storePwdFile(const uint8_t *pw, unsigned char _rec[OPAQUE_USER_RECORD
 
   // rw := F_k_s (pw),
   uint8_t rw[32];
-  oprf(pw, strlen((char*)pw), rec->k_s, rw);
+  oprf(pw, pwlen, rec->k_s, rw);
 
   randombytes(rec->salt, sizeof(rec->salt));
   if (crypto_pwhash(rw, sizeof rw, (const char*) rw, sizeof rw, rec->salt,
@@ -168,13 +168,13 @@ int opaque_storePwdFile(const uint8_t *pw, unsigned char _rec[OPAQUE_USER_RECORD
   return 0;
 }
 
-static void blindPW(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
+static void blindPW(const uint8_t *pw, const ssize_t pwlen, uint8_t *r, uint8_t *alpha) {
   // U picks r
   randombytes(r, DECAF_X25519_PRIVATE_BYTES);
 
   // sets α := (H^0(pw))^r
   uint8_t h0[32];
-  crypto_generichash(h0, sizeof h0, pw, strlen((char*)pw), 0, 0);
+  crypto_generichash(h0, sizeof h0, pw, pwlen, 0, 0);
   decaf_255_point_t H0;
   decaf_255_point_from_hash_nonuniform(H0, h0);
   decaf_bzero(h0, sizeof(h0));
@@ -188,11 +188,11 @@ static void blindPW(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
 
 //(UsrSession, sid , ssid , S, pw): U picks r, x_u ←_R Z_q ; sets α := (H^0(pw))^r and
 //X_u := g^x_u ; sends α and X_u to S.
-void opaque_usrSession(const uint8_t *pw, unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
+void opaque_usrSession(const uint8_t *pw, const ssize_t pwlen, unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret*) _sec;
   Opaque_UserSession *pub = (Opaque_UserSession*) _pub;
 
-  blindPW(pw, sec->r, pub->alpha);
+  blindPW(pw, pwlen, sec->r, pub->alpha);
 
   // x_u ←_R Z_q
   randombytes(sec->x_u, DECAF_X25519_PRIVATE_BYTES);
@@ -303,7 +303,7 @@ static int user_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], con
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int opaque_userSessionEnd(const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *pw, uint8_t *sk) {
+int opaque_userSessionEnd(const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *pw, const ssize_t pwlen, uint8_t *sk) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
 
@@ -329,7 +329,7 @@ int opaque_userSessionEnd(const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], 
   // rw = H(pw, β^(1/r))
   crypto_generichash_state state;
   crypto_generichash_init(&state, 0, 0, 32);
-  crypto_generichash_update(&state, pw, strlen((char*) pw));
+  crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
   crypto_generichash_final(&state, rw, 32);
   decaf_bzero(h0, sizeof(h0));
@@ -371,8 +371,8 @@ int opaque_userSessionEnd(const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], 
 // variant where the secrets of U never touch S unencrypted
 
 // U computes: blinded PW
-void opaque_newUser(const uint8_t *pw, uint8_t *r, uint8_t *alpha) {
-  blindPW(pw, r, alpha);
+void opaque_newUser(const uint8_t *pw, const ssize_t pwlen, uint8_t *r, uint8_t *alpha) {
+  blindPW(pw, pwlen, r, alpha);
 }
 
 // initUser: S
@@ -417,7 +417,7 @@ int opaque_initUser(const uint8_t *alpha, unsigned char _sec[OPAQUE_REGISTER_SEC
 // (c) p_u ←_R Z_q
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
-int opaque_registerUser(const uint8_t *pw, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
 
@@ -443,7 +443,7 @@ int opaque_registerUser(const uint8_t *pw, const uint8_t *r, const unsigned char
   // rw = H(pw, β^(1/r))
   crypto_generichash_state state;
   crypto_generichash_init(&state, 0, 0, 32);
-  crypto_generichash_update(&state, pw, strlen((char*) pw));
+  crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
   crypto_generichash_final(&state, rw, 32);
   decaf_bzero(h0, sizeof(h0));

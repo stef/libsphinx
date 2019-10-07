@@ -22,7 +22,7 @@
    this record and any binding to user names or as the paper suggests
    sid.
  */
-int opaque_storePwdFile(const uint8_t *pw, unsigned char rec[OPAQUE_USER_RECORD_LEN]);
+int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, unsigned char rec[OPAQUE_USER_RECORD_LEN]);
 
 /*
   This function initiates a new OPAQUE session, is the same as the
@@ -32,7 +32,7 @@ int opaque_storePwdFile(const uint8_t *pw, unsigned char rec[OPAQUE_USER_RECORD_
   protect the sec value until later in the protocol and send the pub
   value over to the Server.
  */
-void opaque_usrSession(const uint8_t *pw, unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN]);
+void opaque_usrSession(const uint8_t *pw, const ssize_t pwlen, unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN]);
 
 /*
   This is the same function as defined in the paper with the same
@@ -55,7 +55,7 @@ int opaque_srvSession(const unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN], c
  session key pk, which should be the same as the one calculated by the
  srvSession() function.
 */
-int opaque_userSessionEnd(const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *pw, uint8_t *sk);
+int opaque_userSessionEnd(const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *pw, const ssize_t pwlen, uint8_t *sk);
 
 /*
  * This is a simple utility function that can be used to calculate
@@ -82,7 +82,7 @@ void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *
  * step 3 of this registration protocol and the value alpha should be
  * passed to the server.
  */
-void opaque_newUser(const uint8_t *pw, uint8_t *r, uint8_t *alpha);
+void opaque_newUser(const uint8_t *pw, const ssize_t pwlen, uint8_t *r, uint8_t *alpha);
 
 /*
  * The server receives alpha from the users invocation of its
@@ -99,7 +99,7 @@ int opaque_initUser(const uint8_t *alpha, unsigned char sec[OPAQUE_REGISTER_SECR
  * initUser(). The result of this is the value rec which should be
  * passed for the last step to the server.
  */
-int opaque_registerUser(const uint8_t *pw, const uint8_t *r, const unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN], unsigned char rec[OPAQUE_USER_RECORD_LEN]);
+int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r, const unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN], unsigned char rec[OPAQUE_USER_RECORD_LEN]);
 
 /*
  * The server combines the sec value from its run of its initUser()
