@@ -55,7 +55,7 @@ int opaque_srvSession(const unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN], c
  session key pk, which should be the same as the one calculated by the
  srvSession() function.
 */
-int opaque_userSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk);
+int opaque_usrSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk);
 
 /*
  * This is a simple utility function that can be used to calculate
