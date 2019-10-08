@@ -31,9 +31,9 @@ static void dump(const uint8_t *p, const size_t len, const char* msg) {
 
 int main(void) {
   uint8_t pw[]="simple guessable dictionary password";
-  ssize_t pwlen=strlen((char*) pw);
-  uint8_t extra[]="some additional secret data";
-  ssize_t extra_len=strlen((char*) extra);
+  size_t pwlen=strlen((char*) pw);
+  uint8_t extra[]="some additional secret data stored in the blob";
+  size_t extra_len=strlen((char*) extra);
   unsigned char rec[OPAQUE_USER_RECORD_LEN+extra_len];
 
   // register user
@@ -83,7 +83,7 @@ int main(void) {
   printf("userSession\n");
   opaque_usrSession(pw, pwlen, sec, pub);
   printf("srvSession\n");
-  if(0!=opaque_srvSession(pub, rec, resp, sk)) return 1;
+  if(0!=opaque_srvSession(pub, rrec, resp, sk)) return 1;
   dump(sk,32,"sk_s: ");
   printf("userSessionEnd\n");
   if(0!=opaque_usrSessionEnd(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
@@ -97,8 +97,8 @@ int main(void) {
   // to the user, which calculates f_pk(1) and verifies it's the same
   // value as sent by the server.
   uint8_t su[32], us[32];
-  opaque_f(sk, sizeof sk, 1, su);
-  opaque_f(pk, sizeof pk, 1, us);
+  opaque_f(sk, sizeof sk, '1', su);
+  opaque_f(pk, sizeof pk, '1', us);
   dump(su, 32, "f_sk(1): ");
   dump(us, 32, "f_pk(1): ");
   if(0!=sodium_memcmp(su,us,32)) return 1;
@@ -106,8 +106,8 @@ int main(void) {
   // to authenticate the user to the server, the user sends f_pk(2)
   // to the server, which calculates f_sk(2) and verifies it's the same
   // value as sent by the user.
-  opaque_f(pk, sizeof pk, 2, us);
-  opaque_f(sk, sizeof sk, 2, su);
+  opaque_f(pk, sizeof pk, '2', us);
+  opaque_f(sk, sizeof sk, '2', su);
   dump(us, 32, "f_pk(2): ");
   dump(su, 32, "f_sk(2): ");
   if(0!=sodium_memcmp(su,us,32)) return 1;
