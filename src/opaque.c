@@ -85,6 +85,7 @@ typedef struct {
 typedef struct {
   uint8_t beta[DECAF_X25519_PUBLIC_BYTES];
   uint8_t X_s[DECAF_X25519_PUBLIC_BYTES];
+  uint8_t auth[DECAF_X25519_PUBLIC_BYTES];
   uint8_t salt[32];
   uint64_t extra_len;
   Opaque_Blob c;
@@ -358,6 +359,8 @@ int opaque_session_srv(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN],
   // also send len of extra data
   memcpy(&resp->extra_len, &rec->extra_len, sizeof rec->extra_len);
 
+  opaque_f(sk, sizeof sk, 1, &resp->auth);
+
   // (f) Outputs (sid , ssid , SK).
   // e&f handled as parameters
 
@@ -451,6 +454,10 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
     decaf_bzero(buf, sizeof(buf));
     return 1;
   }
+
+  uint8_t auth[32];
+  opaque_f(sk, sizeof sk, 1, auth);
+  if(0!=sodium_memcmp(auth,resp->auth,32)) return 1;
 
   // copy out extra
   if(resp->extra_len)
