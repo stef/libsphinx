@@ -32,18 +32,20 @@ static void dump(const uint8_t *p, const size_t len, const char* msg) {
 int main(void) {
   uint8_t pw[]="simple guessable dictionary password";
   ssize_t pwlen=strlen((char*) pw);
-  unsigned char rec[OPAQUE_USER_RECORD_LEN];
+  uint8_t extra[]="some additional secret data";
+  ssize_t extra_len=strlen((char*) extra);
+  unsigned char rec[OPAQUE_USER_RECORD_LEN+extra_len];
 
   // register user
   printf("storePwdFile\n");
-  if(0!=opaque_storePwdFile(pw, pwlen, rec)) return 1;
+  if(0!=opaque_storePwdFile(pw, pwlen, extra, extra_len, rec)) return 1;
 
   // initiate login
   unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
   printf("usrSession\n");
   opaque_usrSession(pw, pwlen, sec, pub);
 
-  unsigned char resp[OPAQUE_SERVER_SESSION_LEN];
+  unsigned char resp[OPAQUE_SERVER_SESSION_LEN+extra_len];
   uint8_t sk[32];
   printf("srvSession\n");
   if(0!=opaque_srvSession(pub, rec, resp, sk)) return 1;
@@ -52,7 +54,10 @@ int main(void) {
 
   uint8_t pk[32];
   printf("usrSessionEnd\n");
-  if(0!=opaque_usrSessionEnd(pw, pwlen, resp, sec, pk)) return 1;
+  uint8_t extra_recovered[extra_len+1];
+  extra_recovered[extra_len]=0;
+  if(0!=opaque_usrSessionEnd(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
+  printf("recovered extra data: \"%s\"\n", extra_recovered);
 
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
@@ -68,9 +73,9 @@ int main(void) {
   printf("initUser\n");
   if(0!=opaque_initUser(alpha, rsec, rpub)) return 1;
   // user commits its secrets
-  unsigned char rrec[OPAQUE_USER_RECORD_LEN];
+  unsigned char rrec[OPAQUE_USER_RECORD_LEN+extra_len];
   printf("registerUser\n");
-  if(0!=opaque_registerUser(pw, pwlen, r, rpub, rrec)) return 1;
+  if(0!=opaque_registerUser(pw, pwlen, r, rpub, extra, extra_len, rrec)) return 1;
   // server "saves"
   printf("saveUser\n");
   opaque_saveUser(rsec, rpub, rrec);
@@ -81,9 +86,10 @@ int main(void) {
   if(0!=opaque_srvSession(pub, rec, resp, sk)) return 1;
   dump(sk,32,"sk_s: ");
   printf("userSessionEnd\n");
-  if(0!=opaque_usrSessionEnd(pw, pwlen, resp, sec, pk)) return 1;
+  if(0!=opaque_usrSessionEnd(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
+  printf("recovered extra data: \"%s\"\n", extra_recovered);
 
   // authenticate both parties:
 

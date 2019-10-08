@@ -37,7 +37,7 @@ typedef struct {
   uint8_t p_u[DECAF_X25519_PRIVATE_BYTES];
   uint8_t P_u[DECAF_X25519_PUBLIC_BYTES];
   uint8_t P_s[DECAF_X25519_PUBLIC_BYTES];
-  uint8_t mac[crypto_secretbox_MACBYTES];
+  uint8_t extra_or_mac[crypto_secretbox_MACBYTES];
 } __attribute((packed)) Opaque_Blob;
 
 // user specific record stored at server upon registration
@@ -47,6 +47,7 @@ typedef struct {
   uint8_t P_u[DECAF_X25519_PUBLIC_BYTES];
   uint8_t P_s[DECAF_X25519_PUBLIC_BYTES];
   uint8_t salt[32];
+  uint64_t extra_len;
   Opaque_Blob c;
 } __attribute((packed)) Opaque_UserRecord;
 
@@ -65,6 +66,7 @@ typedef struct {
   uint8_t beta[DECAF_X25519_PUBLIC_BYTES];
   uint8_t X_s[DECAF_X25519_PUBLIC_BYTES];
   uint8_t salt[32];
+  uint64_t extra_len;
   Opaque_Blob c;
 } __attribute((packed)) Opaque_ServerSession;
 
@@ -122,7 +124,7 @@ void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *
 // (StorePwdFile, sid , U, pw): S computes k_s ←_R Z_q , rw := F_k_s (pw),
 // p_s ←_R Z_q , p_u ←_R Z_q , P_s := g^p_s , P_u := g^p_u , c ← AuthEnc_rw (p_u, P_u, P_s);
 // it records file[sid ] := {k_s, p_s, P_s, P_u, c}.
-int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_UserRecord *rec = (Opaque_UserRecord *)_rec;
 
   // k_s ←_R Z_q
@@ -155,14 +157,19 @@ int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, unsigned char _r
   // copy Pubkeys also into rec.c
   memcpy(rec->c.P_u, rec->P_u,DECAF_X25519_PUBLIC_BYTES*2);
 
-  // c ← AuthEnc_rw(p_u,P_u,P_s);
-  randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                        // nonce for crypto_secretbox
+  rec->extra_len = extra_len;
+  // copy extra data into rec.c
+  if(extra_len)
+     memcpy(rec->c.extra_or_mac, extra, extra_len);
 
-  crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,         // ciphertext
-                        ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,         // plaintext
-                        DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2,  // plaintext len
-                        ((uint8_t*)&rec->c),                                     // nonce
-                        rw);                                                     // key
+  // c ← AuthEnc_rw(p_u,P_u,P_s);
+  randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                                  // nonce for crypto_secretbox
+
+  crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // ciphertext
+                        ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // plaintext
+                        DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2+extra_len,  // plaintext len
+                        ((uint8_t*)&rec->c),                                               // nonce
+                        rw);                                                               // key
 
   decaf_bzero(rw, sizeof(rw));
   return 0;
@@ -270,9 +277,11 @@ int opaque_srvSession(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], 
   decaf_bzero(x_s, sizeof(x_s));
 
   // (e) Sends β, X_s and c to U;
-  memcpy(&resp->c, &rec->c, sizeof rec->c);
+  memcpy(&resp->c, &rec->c, sizeof rec->c + rec->extra_len);
   // also send salt
   memcpy(&resp->salt, &rec->salt, sizeof rec->salt);
+  // also send len of extra data
+  memcpy(&resp->extra_len, &rec->extra_len, sizeof rec->extra_len);
 
   // (f) Outputs (sid , ssid , SK).
   // e&f handled as parameters
@@ -303,7 +312,7 @@ static int user_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], con
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int opaque_usrSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk) {
+int opaque_usrSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
 
@@ -344,11 +353,13 @@ int opaque_usrSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned 
 
   // (c) Computes AuthDec_rw(c). If the result is ⊥, outputs (abort, sid , ssid ) and halts.
   //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
-  Opaque_Blob c;
-  if(0!=crypto_secretbox_open_easy(((uint8_t*)&c)+crypto_secretbox_NONCEBYTES,          // plaintext
+  if(OPAQUE_BLOB_LEN+resp->extra_len < OPAQUE_BLOB_LEN) return 1; // check integer overflow
+  uint8_t buf[OPAQUE_BLOB_LEN+resp->extra_len];
+  Opaque_Blob *c = (Opaque_Blob *) buf;
+  if(0!=crypto_secretbox_open_easy(buf+crypto_secretbox_NONCEBYTES,                     // plaintext
                                    ((uint8_t*)&resp->c)+crypto_secretbox_NONCEBYTES,    // ciphertext
                                                                                         // plaintext len
-                                   DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2+crypto_secretbox_MACBYTES,
+                                   DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2+crypto_secretbox_MACBYTES+resp->extra_len,
                                    ((uint8_t*)&resp->c),                                // nonce
                                    rw)) {                                               // key
     decaf_bzero(rw, sizeof(h0));
@@ -357,11 +368,16 @@ int opaque_usrSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned 
   decaf_bzero(rw, sizeof(h0));
 
   // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
-  if(0!=user_kex(sk, c.p_u, sec->x_u, c.P_s, resp->X_s)) {
-    decaf_bzero(&c, sizeof(c));
+  if(0!=user_kex(sk, c->p_u, sec->x_u, c->P_s, resp->X_s)) {
+    decaf_bzero(buf, sizeof(buf));
     return 1;
   }
-  decaf_bzero(&c, sizeof(c));
+
+  // copy out extra
+  if(resp->extra_len)
+     memcpy(extra, c->extra_or_mac, resp->extra_len);
+
+  decaf_bzero(buf, sizeof(buf));
 
   // (e) Outputs (sid, ssid, SK).
 
@@ -417,7 +433,7 @@ int opaque_initUser(const uint8_t *alpha, unsigned char _sec[OPAQUE_REGISTER_SEC
 // (c) p_u ←_R Z_q
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
-int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
 
@@ -471,14 +487,18 @@ int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r
   // copy P_s into rec.c
   memcpy(rec->c.P_s, pub->P_s,DECAF_X25519_PUBLIC_BYTES);
 
-  // c ← AuthEnc_rw(p_u,P_u,P_s);
-  randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                        // nonce for crypto_secretbox
+  // copy extra data into rec.c
+  if(extra_len)
+     memcpy(rec->c.extra_or_mac, extra, extra_len);
 
-  crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,         // ciphertext
-                        ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,         // plaintext
-                        DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2,  // plaintext len
-                        ((uint8_t*)&rec->c),                                     // nonce
-                        rw);                                                     // key
+  // c ← AuthEnc_rw(p_u,P_u,P_s);
+  randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                                  // nonce for crypto_secretbox
+
+  crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // ciphertext
+                        ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // plaintext
+                        DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2+extra_len,  // plaintext len
+                        ((uint8_t*)&rec->c),                                               // nonce
+                        rw);                                                               // key
 
   decaf_bzero(rw, sizeof(rw));
 
