@@ -38,17 +38,17 @@ int main(void) {
 
   // register user
   printf("storePwdFile\n");
-  if(0!=opaque_storePwdFile(pw, pwlen, extra, extra_len, rec)) return 1;
+  if(0!=opaque_init_srv(pw, pwlen, extra, extra_len, rec)) return 1;
 
   // initiate login
   unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
   printf("usrSession\n");
-  opaque_usrSession(pw, pwlen, sec, pub);
+  opaque_session_usr_start(pw, pwlen, sec, pub);
 
   unsigned char resp[OPAQUE_SERVER_SESSION_LEN+extra_len];
   uint8_t sk[32];
   printf("srvSession\n");
-  if(0!=opaque_srvSession(pub, rec, resp, sk)) return 1;
+  if(0!=opaque_session_srv(pub, rec, resp, sk)) return 1;
 
   dump(sk,32,"sk_s: ");
 
@@ -56,7 +56,7 @@ int main(void) {
   printf("usrSessionEnd\n");
   uint8_t extra_recovered[extra_len+1];
   extra_recovered[extra_len]=0;
-  if(0!=opaque_usrSessionEnd(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);
 
   dump(pk,32,"sk_u: ");
@@ -67,26 +67,26 @@ int main(void) {
   uint8_t r[DECAF_X25519_PRIVATE_BYTES];
   // user initiates:
   printf("newUser\n");
-  opaque_newUser(pw, pwlen, r, alpha);
+  opaque_private_init_usr_start(pw, pwlen, r, alpha);
   // server responds
   unsigned char rsec[OPAQUE_REGISTER_SECRET_LEN], rpub[OPAQUE_REGISTER_PUBLIC_LEN];
   printf("initUser\n");
-  if(0!=opaque_initUser(alpha, rsec, rpub)) return 1;
+  if(0!=opaque_private_init_srv_respond(alpha, rsec, rpub)) return 1;
   // user commits its secrets
   unsigned char rrec[OPAQUE_USER_RECORD_LEN+extra_len];
   printf("registerUser\n");
-  if(0!=opaque_registerUser(pw, pwlen, r, rpub, extra, extra_len, rrec)) return 1;
+  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, extra, extra_len, rrec)) return 1;
   // server "saves"
   printf("saveUser\n");
-  opaque_saveUser(rsec, rpub, rrec);
+  opaque_private_init_srv_finish(rsec, rpub, rrec);
 
   printf("userSession\n");
-  opaque_usrSession(pw, pwlen, sec, pub);
+  opaque_session_usr_start(pw, pwlen, sec, pub);
   printf("srvSession\n");
-  if(0!=opaque_srvSession(pub, rrec, resp, sk)) return 1;
+  if(0!=opaque_session_srv(pub, rrec, resp, sk)) return 1;
   dump(sk,32,"sk_s: ");
   printf("userSessionEnd\n");
-  if(0!=opaque_usrSessionEnd(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);
