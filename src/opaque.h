@@ -53,9 +53,10 @@ int opaque_session_srv(const unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN], 
  an input to this final step. All these input parameters are transformed into a
  shared/secret session key pk, which should be the same as the one calculated
  by the srvSession() function. *Attention* resp has a length depending on extra
- data.
+ data. If rwd is not NULL it is returned - this enables to run the sphinx protocol
+ in the opaque protocol.
 */
-int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra);
+int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra, uint8_t rwd[crypto_secretbox_KEYBYTES]);
 
 /*
  * This is a simple utility function that can be used to calculate

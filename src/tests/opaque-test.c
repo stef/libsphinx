@@ -54,9 +54,9 @@ int main(void) {
 
   uint8_t pk[32];
   printf("usrSessionEnd\n");
-  uint8_t extra_recovered[extra_len+1];
+  uint8_t extra_recovered[extra_len+1], rwd[crypto_secretbox_KEYBYTES];
   extra_recovered[extra_len]=0;
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered, rwd)) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);
 
   dump(pk,32,"sk_u: ");
@@ -86,7 +86,7 @@ int main(void) {
   if(0!=opaque_session_srv(pub, rrec, resp, sk)) return 1;
   dump(sk,32,"sk_s: ");
   printf("userSessionEnd\n");
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered)) return 1;
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered, rwd)) return 1;
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);

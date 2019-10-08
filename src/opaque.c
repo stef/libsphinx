@@ -394,7 +394,7 @@ static int user_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], con
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra) {
+int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra, uint8_t rwd[crypto_secretbox_KEYBYTES]) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
 
@@ -413,7 +413,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
   decaf_255_point_scalarmul(H0, Beta, r);
   decaf_255_scalar_destroy(r);
   decaf_255_point_destroy(Beta);
-  uint8_t h0[32], rw[32];
+  uint8_t h0[32], rw[crypto_secretbox_KEYBYTES];
   decaf_255_point_encode(h0, H0);
   decaf_255_point_destroy(H0);
 
@@ -447,6 +447,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
     decaf_bzero(rw, sizeof(h0));
     return 1;
   }
+  if(rwd!=NULL) memcpy(rwd,rw,crypto_secretbox_KEYBYTES);
   decaf_bzero(rw, sizeof(h0));
 
   // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
