@@ -359,7 +359,7 @@ int opaque_session_srv(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN],
   // also send len of extra data
   memcpy(&resp->extra_len, &rec->extra_len, sizeof rec->extra_len);
 
-  opaque_f(sk, sizeof sk, 1, &resp->auth);
+  opaque_f(sk, sizeof sk, 1, resp->auth);
 
   // (f) Outputs (sid , ssid , SK).
   // e&f handled as parameters
