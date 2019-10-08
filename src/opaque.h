@@ -22,7 +22,7 @@
    record and any binding to user names or as the paper suggests sid.
    *Attention* the size of rec depends on the size of extra data provided.
  */
-int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, const unsigned char *extra, const uint64_t extra_len, unsigned char rec[OPAQUE_USER_RECORD_LEN]);
+int opaque_storePwdFile(const uint8_t *pw, const size_t pwlen, const unsigned char *extra, const uint64_t extra_len, unsigned char rec[OPAQUE_USER_RECORD_LEN]);
 
 /*
   This function initiates a new OPAQUE session, is the same as the function
@@ -31,7 +31,7 @@ int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, const unsigned c
   pub output parameter. The User should protect the sec value until later in
   the protocol and send the pub value over to the Server.
  */
-void opaque_usrSession(const uint8_t *pw, const ssize_t pwlen, unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN]);
+void opaque_usrSession(const uint8_t *pw, const size_t pwlen, unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN]);
 
 /*
   This is the same function as defined in the paper with the same name. It runs
@@ -54,7 +54,7 @@ int opaque_srvSession(const unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN], c
  by the srvSession() function. *Attention* resp has a length depending on extra
  data.
 */
-int opaque_usrSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra);
+int opaque_usrSessionEnd(const uint8_t *pw, const size_t pwlen, const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra);
 
 /*
  * This is a simple utility function that can be used to calculate
@@ -81,7 +81,7 @@ void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *
  * step 3 of this registration protocol and the value alpha should be
  * passed to the server.
  */
-void opaque_newUser(const uint8_t *pw, const ssize_t pwlen, uint8_t *r, uint8_t *alpha);
+void opaque_newUser(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *alpha);
 
 /*
  * The server receives alpha from the users invocation of its
@@ -100,7 +100,7 @@ int opaque_initUser(const uint8_t *alpha, unsigned char sec[OPAQUE_REGISTER_SECR
  * passed for the last step to the server. *Attention* the size of rec depends
  * on extra data length.
  */
-int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r, const unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char rec[OPAQUE_USER_RECORD_LEN]);
+int opaque_registerUser(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char rec[OPAQUE_USER_RECORD_LEN]);
 
 /*
  * The server combines the sec value from its run of its initUser() function

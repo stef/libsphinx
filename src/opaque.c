@@ -23,14 +23,34 @@
        3/ implements a variant where U secrets never hit S unprotected
 */
 
+//#define TRACE 1
+
 #include <stdint.h>
 #include <string.h>
 #include "decaf.h"
 #include <crypto_generichash.h>
 #include <crypto_pwhash.h>
+#ifndef TRACE
 #include <randombytes.h>
+#endif
 #include <sodium/utils.h>
 #include "opaque.h"
+
+#ifdef TRACE
+#include <stdio.h>
+
+static void dump(const uint8_t *p, const size_t len, const char* msg) {
+  int i;
+  printf("%s",msg);
+  for(i=0;i<len;i++)
+    printf("%02x", p[i]);
+  printf("\n");
+}
+
+static void randombytes(unsigned char* buf, size_t len) {
+  memset(buf,0xa,len);
+}
+#endif
 
 typedef struct {
   uint8_t nonce[crypto_secretbox_NONCEBYTES];
@@ -80,7 +100,7 @@ typedef struct {
   uint8_t k_s[DECAF_X25519_PRIVATE_BYTES];
 } __attribute((packed)) Opaque_RegisterSec;
 
-static void oprf(const uint8_t *x, const ssize_t x_len, const uint8_t *k, uint8_t *res) {
+static void oprf(const uint8_t *x, const size_t x_len, const uint8_t *k, uint8_t *res) {
   // F_k(x) = H(x, (H0(x))^k) for key k ∈ Z_q
 
   // hash x with H0
@@ -118,14 +138,23 @@ void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *
   memset(v,val,32);
   crypto_generichash(res, DECAF_X25519_PUBLIC_BYTES,  // output
                      v, sizeof v,                     // msg
-                     k, 32);                          // key
+                     k, k_len);                       // key
+#ifdef TRACE
+  dump(k, k_len, "k ");
+  dump(&val, 1, "val ");
+  dump(v, 32, "v ");
+  dump(res, DECAF_X25519_PUBLIC_BYTES, "res ");
+#endif
 }
 
 // (StorePwdFile, sid , U, pw): S computes k_s ←_R Z_q , rw := F_k_s (pw),
 // p_s ←_R Z_q , p_u ←_R Z_q , P_s := g^p_s , P_u := g^p_u , c ← AuthEnc_rw (p_u, P_u, P_s);
 // it records file[sid ] := {k_s, p_s, P_s, P_u, c}.
-int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+int opaque_storePwdFile(const uint8_t *pw, const size_t pwlen, const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_UserRecord *rec = (Opaque_UserRecord *)_rec;
+#ifdef TRACE
+  memset(_rec,0,sizeof(Opaque_UserRecord)+extra_len);
+#endif
 
   // k_s ←_R Z_q
   randombytes(rec->k_s, 32);
@@ -133,6 +162,10 @@ int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, const unsigned c
   // rw := F_k_s (pw),
   uint8_t rw[32];
   oprf(pw, pwlen, rec->k_s, rw);
+
+#ifdef TRACE
+  dump((uint8_t*) rw, 32, "rw ");
+#endif
 
   randombytes(rec->salt, sizeof(rec->salt));
   if (crypto_pwhash(rw, sizeof rw, (const char*) rw, sizeof rw, rec->salt,
@@ -142,28 +175,57 @@ int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, const unsigned c
     return 1;
   }
 
+#ifdef TRACE
+  dump((uint8_t*) rw, 32, "key ");
+#endif
+
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
   // p_s ←_R Z_q
   randombytes(rec->p_s, DECAF_X25519_PRIVATE_BYTES); // random server secret key */
 
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
   // p_u ←_R Z_q
   randombytes(rec->c.p_u, DECAF_X25519_PRIVATE_BYTES); // random user secret key */
 
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
   // P_s := g^p_s
   decaf_x25519_derive_public_key(rec->P_s, rec->p_s);
 
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
   // P_u := g^p_u
   decaf_x25519_derive_public_key(rec->P_u, rec->c.p_u);
 
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
   // copy Pubkeys also into rec.c
   memcpy(rec->c.P_u, rec->P_u,DECAF_X25519_PUBLIC_BYTES*2);
 
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
   rec->extra_len = extra_len;
   // copy extra data into rec.c
   if(extra_len)
      memcpy(rec->c.extra_or_mac, extra, extra_len);
 
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
   // c ← AuthEnc_rw(p_u,P_u,P_s);
   randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                                  // nonce for crypto_secretbox
+
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
 
   crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // ciphertext
                         ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // plaintext
@@ -172,10 +234,14 @@ int opaque_storePwdFile(const uint8_t *pw, const ssize_t pwlen, const unsigned c
                         rw);                                                               // key
 
   decaf_bzero(rw, sizeof(rw));
+
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "cipher user rec ");
+#endif
   return 0;
 }
 
-static void blindPW(const uint8_t *pw, const ssize_t pwlen, uint8_t *r, uint8_t *alpha) {
+static void blindPW(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *alpha) {
   // U picks r
   randombytes(r, DECAF_X25519_PRIVATE_BYTES);
 
@@ -195,17 +261,25 @@ static void blindPW(const uint8_t *pw, const ssize_t pwlen, uint8_t *r, uint8_t 
 
 //(UsrSession, sid , ssid , S, pw): U picks r, x_u ←_R Z_q ; sets α := (H^0(pw))^r and
 //X_u := g^x_u ; sends α and X_u to S.
-void opaque_usrSession(const uint8_t *pw, const ssize_t pwlen, unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
+void opaque_usrSession(const uint8_t *pw, const size_t pwlen, unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret*) _sec;
   Opaque_UserSession *pub = (Opaque_UserSession*) _pub;
 
   blindPW(pw, pwlen, sec->r, pub->alpha);
+#ifdef TRACE
+  dump(_sec,OPAQUE_USER_SESSION_SECRET_LEN, "sec ");
+  dump(_pub,OPAQUE_USER_SESSION_PUBLIC_LEN, "pub ");
+#endif
 
   // x_u ←_R Z_q
   randombytes(sec->x_u, DECAF_X25519_PRIVATE_BYTES);
 
   // X_u := g^x_u
   decaf_x25519_derive_public_key(pub->X_u, sec->x_u);
+#ifdef TRACE
+  dump(_sec,OPAQUE_USER_SESSION_SECRET_LEN, "sec ");
+  dump(_pub,OPAQUE_USER_SESSION_PUBLIC_LEN, "pub ");
+#endif
 }
 
 static void derive_secret(uint8_t *mk, const uint8_t *sec) {
@@ -257,6 +331,7 @@ int opaque_srvSession(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], 
 
   // (c) Picks x_s ←_R Z_q
   uint8_t x_s[DECAF_X25519_PRIVATE_BYTES];
+  randombytes(x_s, DECAF_X25519_PRIVATE_BYTES);
 
   // computes β := α^k_s
   decaf_255_point_t Beta;
@@ -286,6 +361,10 @@ int opaque_srvSession(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], 
   // (f) Outputs (sid , ssid , SK).
   // e&f handled as parameters
 
+#ifdef TRACE
+  dump(_resp,OPAQUE_SERVER_SESSION_LEN+rec->extra_len, "resp ");
+#endif
+
   return 0;
 }
 
@@ -312,7 +391,7 @@ static int user_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], con
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int opaque_usrSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra) {
+int opaque_usrSessionEnd(const uint8_t *pw, const size_t pwlen, const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
 
@@ -387,7 +466,7 @@ int opaque_usrSessionEnd(const uint8_t *pw, const ssize_t pwlen, const unsigned 
 // variant where the secrets of U never touch S unencrypted
 
 // U computes: blinded PW
-void opaque_newUser(const uint8_t *pw, const ssize_t pwlen, uint8_t *r, uint8_t *alpha) {
+void opaque_newUser(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *alpha) {
   blindPW(pw, pwlen, r, alpha);
 }
 
@@ -433,9 +512,12 @@ int opaque_initUser(const uint8_t *alpha, unsigned char _sec[OPAQUE_REGISTER_SEC
 // (c) p_u ←_R Z_q
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
-int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+int opaque_registerUser(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
+#ifdef TRACE
+  memset(_rec,0,sizeof(Opaque_UserRecord)+extra_len);
+#endif
 
   // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
   decaf_255_point_t Beta;
@@ -465,6 +547,10 @@ int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r
   decaf_bzero(h0, sizeof(h0));
   decaf_bzero(&state, sizeof(state));
 
+#ifdef TRACE
+  dump((uint8_t*) rw, 32, "rw ");
+#endif
+
   // generate salt
   randombytes(rec->salt, sizeof(rec->salt));
 
@@ -474,6 +560,10 @@ int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r
     /* out of memory */
     return 1;
   }
+
+#ifdef TRACE
+  dump((uint8_t*) rw, 32, "key ");
+#endif
 
   // p_u ←_R Z_q
   randombytes(rec->c.p_u, DECAF_X25519_PRIVATE_BYTES); // random user secret key */
@@ -488,17 +578,26 @@ int opaque_registerUser(const uint8_t *pw, const ssize_t pwlen, const uint8_t *r
   memcpy(rec->c.P_s, pub->P_s,DECAF_X25519_PUBLIC_BYTES);
 
   // copy extra data into rec.c
+  rec->extra_len = extra_len;
+     memcpy(rec->c.extra_or_mac, extra, extra_len);
   if(extra_len)
      memcpy(rec->c.extra_or_mac, extra, extra_len);
 
   // c ← AuthEnc_rw(p_u,P_u,P_s);
   randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                                  // nonce for crypto_secretbox
 
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
+#endif
+
   crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // ciphertext
                         ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // plaintext
                         DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2+extra_len,  // plaintext len
                         ((uint8_t*)&rec->c),                                               // nonce
                         rw);                                                               // key
+#ifdef TRACE
+  dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "cipher user rec ");
+#endif
 
   decaf_bzero(rw, sizeof(rw));
 
@@ -514,4 +613,7 @@ void opaque_saveUser(const unsigned char _sec[OPAQUE_REGISTER_SECRET_LEN], const
   memcpy(rec->k_s, sec->k_s, sizeof rec->k_s);
   memcpy(rec->p_s, sec->p_s, sizeof rec->p_s);
   memcpy(rec->P_s, pub->P_s, sizeof rec->P_s);
+#ifdef TRACE
+  dump((uint8_t*) rec, sizeof(Opaque_UserRecord)+rec->extra_len, "user rec ");
+#endif
 }
