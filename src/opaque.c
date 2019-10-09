@@ -520,7 +520,8 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, unsigned char _sec[OPA
 // (c) p_u ←_R Z_q
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
-int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN], uint8_t rwd[crypto_secretbox_KEYBYTES]) {
+
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
 #ifdef TRACE
@@ -607,6 +608,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
   dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "cipher user rec ");
 #endif
 
+  if(rwd!=NULL) memcpy(rwd,rw,crypto_secretbox_KEYBYTES);
   decaf_bzero(rw, sizeof(rw));
 
   return 0;

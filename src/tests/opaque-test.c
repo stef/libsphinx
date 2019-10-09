@@ -58,7 +58,7 @@ int main(void) {
   extra_recovered[extra_len]=0;
   if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered, rwd)) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);
-
+  dump(rwd,32,"rwd: ");
   dump(pk,32,"sk_u: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
 
@@ -75,7 +75,7 @@ int main(void) {
   // user commits its secrets
   unsigned char rrec[OPAQUE_USER_RECORD_LEN+extra_len];
   printf("registerUser\n");
-  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, extra, extra_len, rrec)) return 1;
+  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, extra, extra_len, rrec, rwd)) return 1;
   // server "saves"
   printf("saveUser\n");
   opaque_private_init_srv_finish(rsec, rpub, rrec);
@@ -88,6 +88,7 @@ int main(void) {
   printf("userSessionEnd\n");
   if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered, rwd)) return 1;
   dump(pk,32,"sk_u: ");
+  dump(rwd,32,"rwd: ");
   if(sodium_memcmp(sk,pk,sizeof sk)!=0) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);
 

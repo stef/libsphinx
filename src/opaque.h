@@ -101,9 +101,10 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, unsigned char sec[OPAQ
  * extra/extra_len parameter can be used to store additional data in the
  * encrypted user record. The result of this is the value rec which should be
  * passed for the last step to the server. *Attention* the size of rec depends
- * on extra data length.
+ * on extra data length. If rwd is not NULL it is returned - this enables to run
+ * the sphinx protocol in the opaque protocol.
  */
-int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char rec[OPAQUE_USER_RECORD_LEN]);
+int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char rec[OPAQUE_USER_RECORD_LEN], uint8_t rwd[crypto_secretbox_KEYBYTES]);
 
 /*
  * The server combines the sec value from its run of its initUser() function
