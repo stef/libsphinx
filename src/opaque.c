@@ -447,8 +447,9 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
     decaf_bzero(rw, sizeof(h0));
     return 1;
   }
-  if(rwd!=NULL) memcpy(rwd,rw,crypto_secretbox_KEYBYTES);
-  decaf_bzero(rw, sizeof(h0));
+  if(rwd!=NULL)
+    crypto_generichash(rwd, crypto_secretbox_KEYBYTES, rw, crypto_secretbox_KEYBYTES, (const uint8_t*) "rwd", 3);
+  decaf_bzero(rw, sizeof(rw));
 
   // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
   if(0!=user_kex(sk, c->p_u, sec->x_u, c->P_s, resp->X_s)) {
@@ -608,7 +609,8 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
   dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "cipher user rec ");
 #endif
 
-  if(rwd!=NULL) memcpy(rwd,rw,crypto_secretbox_KEYBYTES);
+  if(rwd!=NULL)
+    crypto_generichash(rwd, crypto_secretbox_KEYBYTES, rw, crypto_secretbox_KEYBYTES, (const uint8_t*)"rwd", 3);
   decaf_bzero(rw, sizeof(rw));
 
   return 0;
