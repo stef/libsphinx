@@ -444,7 +444,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
                                    DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES*2+crypto_secretbox_MACBYTES+resp->extra_len,
                                    ((uint8_t*)&resp->c),                                // nonce
                                    rw)) {                                               // key
-    decaf_bzero(rw, sizeof(h0));
+    decaf_bzero(rw, sizeof(rw));
     return 1;
   }
   if(rwd!=NULL)
@@ -454,12 +454,16 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
   // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
   if(0!=user_kex(sk, c->p_u, sec->x_u, c->P_s, resp->X_s)) {
     decaf_bzero(buf, sizeof(buf));
+    decaf_bzero(rw, sizeof(rw));
     return 1;
   }
 
   uint8_t auth[32];
   opaque_f(sk, sizeof sk, 1, auth);
-  if(0!=sodium_memcmp(auth,resp->auth,32)) return 1;
+  if(0!=sodium_memcmp(auth,resp->auth,32)) {
+    if(rwd!=NULL) decaf_bzero(rwd, crypto_secretbox_KEYBYTES);
+    return 1;
+  }
 
   // copy out extra
   if(resp->extra_len)
