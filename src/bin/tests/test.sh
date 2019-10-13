@@ -18,7 +18,7 @@ echo "run 1 respond to challenge"
 
 fname=$(cat b)
 echo "run 1 derive password from response"
-../derive $fname <r0 >pwd0
+{ cat r0; echo -n "shitty master password"; } | ../derive $fname >pwd0
 
 echo "second run"
 echo "run 2 create challenge"
@@ -27,7 +27,7 @@ echo "run 2 respond to challenge"
 ../respond secret <c >r1
 fname=$(cat b)
 echo "run 2 derive password from response"
-../derive $fname <r1 >pwd1
+{ cat r1; echo -n "shitty master password"; } | ../derive $fname >pwd1
 
 rm c b
 
@@ -51,16 +51,15 @@ echo "success two runs produced the same password output"
 
 echo "transforming into ascii passwords"
 echo -n "full ascii, max size: " 
-../../../python/pwdsphinx/bin2pass.py <pwd0
+../2pass <pwd0
 echo -n "no symbols, max size: " 
-../../../python/pwdsphinx/bin2pass.py uld <pwd0
+../2pass uld <pwd0
 echo -n "no symbols, 8 chars: " 
-../../../python/pwdsphinx/bin2pass.py uld 8 <pwd0
+../2pass uld 8 <pwd0
 echo -n "only digits, 4 chars: " 
-../../../python/pwdsphinx/bin2pass.py d 4 <pwd0
+../2pass d 4 <pwd0
 echo -n "only letters, 16 chars: " 
-../../../python/pwdsphinx/bin2pass.py ul 16 <pwd0
+../2pass ul 16 <pwd0
 
 rm pwd0
-
-
+rm secret
