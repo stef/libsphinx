@@ -16,11 +16,12 @@
     along with pitchforked sphinx. If not, see <http://www.gnu.org/licenses/>.
 */
 #include <stdio.h>
-#include <decaf.h>
+#include <stdint.h>
+#include <sodium.h>
 
 int main(int argc, char** argv) {
-  uint8_t challenge[DECAF_255_SER_BYTES],
-    secret[DECAF_255_SCALAR_BYTES];
+  uint8_t challenge[crypto_core_ristretto255_BYTES];
+  uint8_t secret[crypto_core_ristretto255_SCALARBYTES];
 
   // read challenge from stdin
   if(fread(challenge, 32, 1, stdin)!=1) {
@@ -40,21 +41,13 @@ int main(int argc, char** argv) {
   }
   fclose(f);
 
-  // deserialize challenge into C
-  decaf_255_point_t C, R;
-  if(DECAF_SUCCESS!=decaf_255_point_decode(C, challenge, DECAF_FALSE)) return 1;
-
-  // peer contributes their own secret: R=Cy
-  decaf_255_scalar_t key;
-  decaf_255_scalar_decode_long(key, secret, sizeof(secret));
-  decaf_255_point_scalarmul(R, C, key);
-
-  // serialize R into out
-  unsigned char out[DECAF_255_SER_BYTES];
-  decaf_255_point_encode(out, R);
+  uint8_t out[crypto_core_ristretto255_BYTES];
+  if (crypto_scalarmult_ristretto255(out, secret, challenge) != 0) {
+    return -1;
+  }
 
   // output the response
-  int i;
+  size_t i;
   for(i=0;i<sizeof(out);i++) {
     printf("%c",out[i]);
   }

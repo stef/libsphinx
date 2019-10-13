@@ -17,16 +17,16 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
-#include <decaf.h>
-#include <randombytes.h>
-#include <crypto_generichash.h>
+#include <sodium.h>
 
 int main(void) {
   // hash the master password from stdin
 
   crypto_generichash_state state;
-  unsigned char hash[DECAF_255_HASH_BYTES];
+  uint8_t hash[crypto_core_ristretto255_HASHBYTES];
+  // hash x with H0
   crypto_generichash_init(&state, 0, 0, sizeof hash);
 
   uint8_t buf[32768]; // 32KB blocks
@@ -37,13 +37,13 @@ int main(void) {
   }
   crypto_generichash_final(&state, hash, sizeof hash);
 
-  // hashed_to_point with elligator the password hash
-  decaf_255_point_t P;
-  decaf_255_point_from_hash_nonuniform(P, hash);
+  // hash x with H0
+  unsigned char H0[crypto_core_ristretto255_BYTES];
+  crypto_core_ristretto255_from_hash(H0, hash);
 
-  // generate random blinding factor
-  unsigned char blinder[DECAF_255_SCALAR_BYTES];
-  randombytes(blinder, sizeof(blinder)); // random blinding factor
+  // blinding factor
+  unsigned char blinder[crypto_core_ristretto255_SCALARBYTES];
+  crypto_core_ristretto255_scalar_random(blinder);
 
   // persist the blinding factor
   char fname[]="/tmp/sphinxXXXXXX";
@@ -59,22 +59,15 @@ int main(void) {
   close(fd);
   fprintf(stderr,"%s",fname);
 
-  // convert the blinding factor into a scalar
-  decaf_255_scalar_t b;
-  decaf_255_scalar_decode_long(b, blinder, sizeof(blinder));
-
-  // blind the message: C=Pb
-  decaf_255_point_t challenge;
-  decaf_255_point_scalarmul(challenge, P, b);
-
-  // serialize the challenge
-  uint8_t out[DECAF_255_SER_BYTES];
-  decaf_255_point_encode(out, challenge);
+  unsigned char challenge[crypto_core_ristretto255_BYTES];
+  if (crypto_scalarmult_ristretto255(challenge, blinder, H0) != 0) {
+    return -1;
+  }
 
   // output the challenge
-  int i;
-  for(i=0;i<sizeof(out);i++) {
-    printf("%c",out[i]);
+  size_t i;
+  for(i=0;i<sizeof(challenge);i++) {
+    printf("%c",challenge[i]);
   }
 
   return 0;

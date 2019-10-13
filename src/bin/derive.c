@@ -17,23 +17,13 @@
 */
 #include <stdio.h>
 #include <unistd.h>
-#include <decaf.h>
-
-void dump(const decaf_255_point_t pt, char* m) {
-  int i;
-  uint8_t ser[DECAF_255_SER_BYTES];
-  decaf_255_point_encode(ser, pt);
-
-  printf("%s", m);
-  for(i=0;i<sizeof(ser);i++) {
-    printf("%02x",ser[i]);
-  }
-  printf("\n");
-}
+#include <stdint.h>
+#include <sodium.h>
 
 int main(int argc, char **argv) {
-  uint8_t blind[DECAF_255_SCALAR_BYTES],
-    resp[DECAF_255_SER_BYTES];
+  (void) argc;
+  uint8_t blind[crypto_core_ristretto255_SCALARBYTES],
+    resp[crypto_core_ristretto255_BYTES];
 
   // read response from stdin
   if(fread(resp, 32, 1, stdin)!=1) {
@@ -53,37 +43,34 @@ int main(int argc, char **argv) {
   }
   fclose(f);
 
-  // decode blinding factor into scalar
-  decaf_255_scalar_t b;
-  decaf_255_scalar_decode_long(b, blind, sizeof(blind));
+  // invert r = 1/r
+  unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
+  if (crypto_core_ristretto255_scalar_invert(ir, blind) != 0) {
+    return -1;
+  }
 
-  // calculate 1/x, so we can unblind R
-  if(decaf_255_scalar_invert(b, b)!=DECAF_SUCCESS) return 1;
+  // beta^(1/r) = h(pwd)^k
+  unsigned char H0_k[crypto_core_ristretto255_BYTES];
+  if (crypto_scalarmult_ristretto255(H0_k, ir, resp) != 0) {
+    return -1;
+  }
 
-  // decode response into point
-  decaf_255_point_t R;
-  if(DECAF_SUCCESS!=decaf_255_point_decode(R, resp, DECAF_FALSE)) return 1;
+  // hash(pwd||H0^k)
+  crypto_generichash_state state;
+  uint8_t out[32];
+  // hash x with H0
+  crypto_generichash_init(&state, 0, 0, sizeof out);
 
-  // unblind the response from the peer: Y=R/x
-  decaf_255_point_t Y;
-  decaf_255_point_scalarmul(Y, R, b);
+  uint8_t buf[32768]; // 32KB blocks
+  int size;
+  while(!feof(stdin)) {
+    size=fread(buf, 1, 32768, stdin);
+    crypto_generichash_update(&state, buf, size);
+  }
+  crypto_generichash_update(&state, H0_k, sizeof H0_k);
+  crypto_generichash_final(&state, out, 32);
 
-
-  unsigned char out[DECAF_255_SER_BYTES];
-  decaf_255_point_encode(out, Y);
-
-  // todo implement the hashing of the unblinded Y
-  //crypto_generichash_state state;
-  //crypto_generichash_init(&state, 0, 0, 32);
-  //crypto_generichash_update(&state, pwd, p_len);
-  //crypto_generichash_update(&state, h0, SPHINX_255_SER_BYTES);
-  //crypto_generichash_final(&state, rwd, SPHINX_255_SER_BYTES);
-  //decaf_bzero(&state, sizeof(state));
-  //decaf_bzero(h0, sizeof(h0));
-
-  // output the response
-
-  int i;
+  size_t i;
   for(i=0;i<sizeof(out);i++) {
     printf("%02x",out[i]);
   }
