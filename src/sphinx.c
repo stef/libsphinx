@@ -24,96 +24,77 @@
 /* params:
  *
  * pwd, p_len: (input) the master password and its length
- * bfac: (output) pointer to array of DECAF_255_SCALAR_BYTES (32) bytes - the blinding factor
- * chal: (output) pointer to array of DECAF_255_SER_BYTES (32) bytes - the challenge
+ * salt, salt_len: (input) salt for hashing the password, can both be NULL/0
+ * bfac: (output) pointer to array of crypto_core_ristretto255_SCALARBYTES (32) bytes - the blinding factor
+ * chal: (output) pointer to array of crypto_core_ristretto255_BYTES (32) bytes - the challenge
  */
-void sphinx_challenge(const uint8_t *pwd, const size_t p_len, uint8_t *bfac, uint8_t *chal) {
-  unsigned char hash[DECAF_255_HASH_BYTES];
-  crypto_generichash(hash, sizeof hash, pwd, p_len, 0, 0);
-  // hashed_to_point with elligator the password hash
-  decaf_255_point_t P;
-  decaf_255_point_from_hash_nonuniform(P, hash);
-  decaf_bzero(hash, sizeof(hash));
+int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt, const size_t salt_len, uint8_t bfac[crypto_core_ristretto255_SCALARBYTES], uint8_t chal[crypto_core_ristretto255_BYTES]) {
+  int ret = -1;
+  // do the blinding
+  uint8_t h0[crypto_core_ristretto255_HASHBYTES];
+  // hash x with H0
+  crypto_generichash(h0, crypto_core_ristretto255_HASHBYTES, pwd, p_len, salt, salt_len);
+  unsigned char H0[crypto_core_ristretto255_BYTES];
+  crypto_core_ristretto255_from_hash(H0, h0);
+  sodium_memzero(h0, crypto_core_ristretto255_HASHBYTES);
 
-  // generate random blinding factor
-  randombytes(bfac, DECAF_255_SCALAR_BYTES); // random blinding factor
+  // random blinding factor
+  crypto_core_ristretto255_scalar_random(bfac);
 
-  // convert the blinding factor into a scalar
-  decaf_255_scalar_t b;
-  decaf_255_scalar_decode_long(b, bfac, DECAF_255_SCALAR_BYTES);
+  // chal = H0^r
+  if (crypto_scalarmult_ristretto255(chal, bfac, H0) == 0) {
+    ret = 0;
+  }
+  sodium_memzero(H0, crypto_core_ristretto255_BYTES);
 
-  // blind the message: C=Pb
-  decaf_255_point_t challenge;
-  decaf_255_point_scalarmul(challenge, P, b);
-  decaf_255_scalar_destroy(b);
-  decaf_255_point_destroy(P);
-
-  // serialize the challenge
-  decaf_255_point_encode(chal, challenge);
-  decaf_255_point_destroy(challenge);
+  return ret;
 }
 
 /* params
- * chal: (input) the challenge, DECAF_255_SER_BYTES (32) bytes array
- * secret: (input) the secret contributing, DECAF_255_SCALAR_BYTES (32) bytes array
- * resp: (output) the response, DECAF_255_SER_BYTES (32) bytes array
+ * chal: (input) the challenge, crypto_core_ristretto255_BYTES(32) bytes array
+ * secret: (input) the secret contributing, crypto_core_ristretto255_SCALARBYTES (32) bytes array
+ * resp: (output) the response, crypto_core_ristretto255_BYTES (32) bytes array
  * returns 1 on error, 0 on success
  */
-int sphinx_respond(const uint8_t *chal, const uint8_t *secret, uint8_t *resp) {
-  // deserialize challenge into C
-  decaf_255_point_t C, R;
-  if(DECAF_SUCCESS!=decaf_255_point_decode(C, chal, DECAF_FALSE)) return 1;
-
-  // peer contributes their own secret: R=Cy
-  decaf_255_scalar_t key;
-  decaf_255_scalar_decode_long(key, secret, DECAF_255_SCALAR_BYTES);
-  decaf_255_point_scalarmul(R, C, key);
-  decaf_255_scalar_destroy(key);
-  decaf_255_point_destroy(C);
-
-  decaf_255_point_encode(resp, R);
-  decaf_255_point_destroy(R);
-
-  return 0;
+int sphinx_respond(const uint8_t chal[crypto_core_ristretto255_BYTES], const uint8_t secret[crypto_core_ristretto255_SCALARBYTES], uint8_t resp[crypto_core_ristretto255_BYTES]) {
+  // server contributes k
+  return crypto_scalarmult_ristretto255(resp, secret, chal);
 }
 
 /* params
  * pwd: (input) the password
  * p_len: (input) the password length
- * bfac: (input) bfac from challenge(), array of DECAF_255_SCALAR_BYTES (32) bytes
- * resp: (input) the response from respond(), DECAF_255_SER_BYTES (32) bytes array
- * rwd: (output) the derived password, DECAF_255_SER_BYTES (32) bytes array
+ * bfac: (input) bfac from challenge(), array of crypto_core_ristretto255_SCALARBYTES (32) bytes
+ * resp: (input) the response from respond(), crypto_core_ristretto255_BYTES (32) bytes array
+ * salt: (input) salt for the final password hashing, crypto_pwhash_SALTBYTES bytes array
+ * rwd: (output) the derived password, crypto_core_ristretto255_BYTES (32) bytes array
  * returns 1 on error, 0 on success
  */
-int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t *bfac, const uint8_t *resp, uint8_t *rwd) {
-  // decode blinding factor into scalar
-  decaf_255_scalar_t b;
-  decaf_255_scalar_decode_long(b, bfac, DECAF_255_SCALAR_BYTES);
+int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[crypto_core_ristretto255_SCALARBYTES], const uint8_t resp[crypto_core_ristretto255_BYTES], const uint8_t salt[crypto_pwhash_SALTBYTES], uint8_t rwd[crypto_core_ristretto255_BYTES]) {
+  // invert bfac = 1/bfac
+  unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
+  if (crypto_core_ristretto255_scalar_invert(ir, bfac) != 0) {
+    return -1;
+  }
 
-  // calculate 1/x, so we can unblind R
-  if(decaf_255_scalar_invert(b, b)!=DECAF_SUCCESS) return 1;
+  // resp^(1/bfac) = h(pwd)^secret
+  unsigned char H0_k[crypto_core_ristretto255_BYTES];
+  if (crypto_scalarmult_ristretto255(H0_k, ir, resp) != 0) {
+    return -1;
+  }
 
-  // decode response into point
-  decaf_255_point_t R;
-  if(DECAF_SUCCESS!=decaf_255_point_decode(R, resp, DECAF_FALSE)) return 1;
-
-  // unblind the response from the peer: Y=R/x
-  decaf_255_point_t Y;
-  decaf_255_point_scalarmul(Y, R, b);
-  decaf_255_scalar_destroy(b);
-  decaf_255_point_destroy(R);
-
-  uint8_t h0[SPHINX_255_SER_BYTES];
-  decaf_255_point_encode(h0, Y);
-  decaf_255_point_destroy(Y);
-
+  // hash(pwd||H0^k)
   crypto_generichash_state state;
-  crypto_generichash_init(&state, 0, 0, 32);
+  crypto_generichash_init(&state, 0, 0, crypto_core_ristretto255_BYTES);
   crypto_generichash_update(&state, pwd, p_len);
-  crypto_generichash_update(&state, h0, SPHINX_255_SER_BYTES);
-  crypto_generichash_final(&state, rwd, SPHINX_255_SER_BYTES);
-  decaf_bzero(&state, sizeof(state));
-  decaf_bzero(h0, sizeof(h0));
+  crypto_generichash_update(&state, H0_k, sizeof H0_k);
+  crypto_generichash_final(&state, rwd, crypto_core_ristretto255_BYTES);
+
+  if (crypto_pwhash(rwd, crypto_core_ristretto255_BYTES, (const char*) rwd, crypto_core_ristretto255_BYTES, salt,
+       crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT) != 0) {
+    /* out of memory */
+    return 1;
+  }
 
   return 0;
 }
