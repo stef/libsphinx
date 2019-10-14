@@ -88,8 +88,11 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *
 
   // rw := F_k_s (pw),
   uint8_t rw[32];
-  sodium_mlock(rw,sizeof rw);
-  if(sphinx_oprf(pw, pwlen, rec->k_s, rw)!=0) return -1;
+  if(-1==sodium_mlock(rw,sizeof rw)) return -1;
+  if(sphinx_oprf(pw, pwlen, rec->k_s, rw)!=0) {
+    sodium_munlock(rw,sizeof rw);
+    return -1;
+  }
 
 #ifdef TRACE
   dump((uint8_t*) rw, 32, "rw ");
@@ -214,11 +217,12 @@ int opaque_session_srv(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN],
 
   // (c) Picks x_s ←_R Z_q
   uint8_t x_s[crypto_scalarmult_SCALARBYTES];
-  sodium_mlock(x_s,sizeof x_s);
+  if(-1==sodium_mlock(x_s,sizeof x_s)) return -1;
   randombytes(x_s, crypto_scalarmult_SCALARBYTES);
 
   // computes β := α^k_s
   if (crypto_scalarmult_ristretto255(resp->beta, rec->k_s, pub->alpha) != 0) {
+    sodium_munlock(x_s, sizeof x_s);
     return -1;
   }
 
@@ -227,7 +231,10 @@ int opaque_session_srv(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN],
 
   // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f_K(0);
   // paper instantiates HMQV, we do only triple-dh
-  if(0!=sphinx_server_3dh(sk, rec->p_s, x_s, rec->P_u, pub->X_u)) return -1;
+  if(0!=sphinx_server_3dh(sk, rec->p_s, x_s, rec->P_u, pub->X_u)) {
+    sodium_munlock(x_s, sizeof(x_s));
+    return -1;
+  }
   sodium_munlock(x_s, sizeof(x_s));
 
   // (e) Sends β, X_s and c to U;
@@ -266,25 +273,38 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
   // (b) Computes rw := H(pw, β^1/r );
   // r = 1/r
   unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
-  sodium_mlock(ir,sizeof ir);
+  if(-1==sodium_mlock(ir,sizeof ir)) return -1;
   if (crypto_core_ristretto255_scalar_invert(ir, sec->r) != 0) {
+    sodium_munlock(ir,sizeof ir);
     return -1;
   }
 
   // h0 = β^(1/r)
   // beta^(1/r) = h(pwd)^k
   unsigned char h0[crypto_core_ristretto255_BYTES];
-  sodium_mlock(h0,sizeof h0);
+  if(-1==sodium_mlock(h0,sizeof h0)) {
+    sodium_munlock(ir,sizeof ir);
+    return -1;
+  }
   if (crypto_scalarmult_ristretto255(h0, ir, resp->beta) != 0) {
+    sodium_munlock(ir,sizeof ir);
+    sodium_munlock(h0,sizeof h0);
     return -1;
   }
   sodium_munlock(ir,sizeof ir);
   uint8_t rw[crypto_secretbox_KEYBYTES];
-  sodium_mlock(rw,sizeof rw);
+  if(-1==sodium_mlock(rw,sizeof rw)) {
+    sodium_munlock(h0,sizeof h0);
+    return -1;
+  }
 
   // rw = H(pw, β^(1/r))
   crypto_generichash_state state;
-  sodium_mlock(&state,sizeof state);
+  if(-1==sodium_mlock(&state,sizeof state)) {
+    sodium_munlock(h0,sizeof h0);
+    sodium_munlock(rw,sizeof rw);
+    return -1;
+  }
   crypto_generichash_init(&state, 0, 0, 32);
   crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
@@ -302,9 +322,15 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
 
   // (c) Computes AuthDec_rw(c). If the result is ⊥, outputs (abort, sid , ssid ) and halts.
   //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
-  if(resp->extra_len > OPAQUE_MAX_EXTRA_BYTES) return -1; // avoid integer overflow in next line
+  if(resp->extra_len > OPAQUE_MAX_EXTRA_BYTES) {
+    sodium_munlock(rw, sizeof rw);
+    return -1; // avoid integer overflow in next line
+  }
   uint8_t buf[OPAQUE_BLOB_LEN+resp->extra_len];
-  sodium_mlock(buf,sizeof buf);
+  if(-1==sodium_mlock(buf,sizeof buf)) {
+    sodium_munlock(rw, sizeof rw);
+    return -1;
+  }
   Opaque_Blob *c = (Opaque_Blob *) buf;
   if(0!=crypto_secretbox_open_easy(buf+crypto_secretbox_NONCEBYTES,                     // plaintext
                                    ((uint8_t*)&resp->c)+crypto_secretbox_NONCEBYTES,    // ciphertext
@@ -327,11 +353,15 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
   }
 
   uint8_t auth[crypto_generichash_BYTES];
-  sodium_mlock(auth, sizeof auth);
+  if(-1==sodium_mlock(auth, sizeof auth)) {
+    sodium_munlock(buf, sizeof(buf));
+    return -1;
+  }
   sphinx_f(sk, sizeof sk, 1, auth);
   if(0!=sodium_memcmp(auth,resp->auth,crypto_generichash_BYTES)) {
     sodium_munlock(auth, sizeof auth);
-    if(rwd!=NULL) sodium_munlock(rwd, crypto_secretbox_KEYBYTES);
+    sodium_munlock(buf, sizeof(buf));
+    if(rwd!=NULL) sodium_memzero(rwd, crypto_secretbox_KEYBYTES);
     return -1;
   }
   sodium_munlock(auth, sizeof auth);
@@ -404,25 +434,38 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
   // (b) Computes rw := H(pw, β^1/r );
   // invert r = 1/r
   unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
-  sodium_mlock(ir, sizeof ir);
+  if(-1==sodium_mlock(ir, sizeof ir)) return -1;
   if (crypto_core_ristretto255_scalar_invert(ir, r) != 0) {
+    sodium_munlock(ir, sizeof ir);
     return -1;
   }
 
   // H0 = β^(1/r)
   // beta^(1/r) = h(pwd)^k
   unsigned char h0[crypto_core_ristretto255_BYTES];
-  sodium_mlock(h0,sizeof h0);
+  if(-1==sodium_mlock(h0,sizeof h0)) {
+    sodium_munlock(ir, sizeof ir);
+    return -1;
+  }
   if (crypto_scalarmult_ristretto255(h0, ir, pub->beta) != 0) {
+    sodium_munlock(ir, sizeof ir);
+    sodium_munlock(h0, sizeof h0);
     return -1;
   }
   sodium_munlock(ir, sizeof ir);
   uint8_t rw[32];
-  sodium_mlock(rw, sizeof rw);
+  if(-1==sodium_mlock(rw, sizeof rw)) {
+    sodium_munlock(h0, sizeof h0);
+    return -1;
+  }
 
   // rw = H(pw, β^(1/r))
   crypto_generichash_state state;
-  sodium_mlock(&state, sizeof state);
+  if(-1==sodium_mlock(&state, sizeof state)) {
+    sodium_munlock(h0, sizeof h0);
+    sodium_munlock(rw, sizeof rw);
+    return -1;
+  }
   crypto_generichash_init(&state, 0, 0, 32);
   crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
