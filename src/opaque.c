@@ -302,7 +302,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
 
   // (c) Computes AuthDec_rw(c). If the result is ⊥, outputs (abort, sid , ssid ) and halts.
   //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
-  if(resp->extra_len > OPAQUE_MAX_EXTRA_BYTES) return -1; // check integer overflow
+  if(resp->extra_len > OPAQUE_MAX_EXTRA_BYTES) return -1; // avoid integer overflow in next line
   uint8_t buf[OPAQUE_BLOB_LEN+resp->extra_len];
   sodium_mlock(buf,sizeof buf);
   Opaque_Blob *c = (Opaque_Blob *) buf;
