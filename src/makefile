@@ -37,8 +37,8 @@ bin/derive$(EXT): bin/derive.c
 bin/2pass$(EXT): bin/2pass.c
 	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS)
 
-libsphinx.$(SOEXT): sphinx.o pake.o opaque.o $(EXTRA_OBJECTS)
-	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) sphinx.o pake.o opaque.o $(EXTRA_OBJECTS) $(LDFLAGS)
+libsphinx.$(SOEXT): sphinx.o pake.o opaque.o common.o $(EXTRA_OBJECTS)
+	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) common.o sphinx.o pake.o opaque.o $(EXTRA_OBJECTS) $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -L. -lsphinx $(LDFLAGS)

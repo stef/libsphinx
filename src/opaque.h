@@ -3,16 +3,16 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include "decaf.h"
-#include <crypto_secretbox.h>
+#include <sodium.h>
 
-#define OPAQUE_BLOB_LEN (crypto_secretbox_NONCEBYTES+DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES+DECAF_X25519_PUBLIC_BYTES+crypto_secretbox_MACBYTES)
-#define OPAQUE_USER_RECORD_LEN (DECAF_255_SCALAR_BYTES+DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PUBLIC_BYTES+DECAF_X25519_PUBLIC_BYTES+32+sizeof(uint64_t)+OPAQUE_BLOB_LEN)
-#define OPAQUE_USER_SESSION_PUBLIC_LEN (DECAF_X25519_PUBLIC_BYTES+DECAF_X25519_PUBLIC_BYTES)
-#define OPAQUE_USER_SESSION_SECRET_LEN (DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PRIVATE_BYTES)
-#define OPAQUE_SERVER_SESSION_LEN (DECAF_X25519_PUBLIC_BYTES+DECAF_X25519_PUBLIC_BYTES+DECAF_X25519_PUBLIC_BYTES+32+sizeof(uint64_t)+OPAQUE_BLOB_LEN)
-#define OPAQUE_REGISTER_PUBLIC_LEN (DECAF_X25519_PUBLIC_BYTES+DECAF_X25519_PUBLIC_BYTES)
-#define OPAQUE_REGISTER_SECRET_LEN (DECAF_X25519_PRIVATE_BYTES+DECAF_X25519_PRIVATE_BYTES)
+#define OPAQUE_BLOB_LEN (crypto_secretbox_NONCEBYTES+crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES+crypto_scalarmult_BYTES+crypto_secretbox_MACBYTES)
+#define OPAQUE_USER_RECORD_LEN (crypto_core_ristretto255_SCALARBYTES+crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES+crypto_scalarmult_BYTES+32+sizeof(uint64_t)+OPAQUE_BLOB_LEN)
+#define OPAQUE_USER_SESSION_PUBLIC_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES)
+#define OPAQUE_USER_SESSION_SECRET_LEN (crypto_core_ristretto255_SCALARBYTES+crypto_scalarmult_SCALARBYTES)
+#define OPAQUE_SERVER_SESSION_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES+crypto_generichash_BYTES+32+sizeof(uint64_t)+OPAQUE_BLOB_LEN)
+#define OPAQUE_REGISTER_PUBLIC_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES)
+#define OPAQUE_REGISTER_SECRET_LEN (crypto_scalarmult_SCALARBYTES+crypto_core_ristretto255_SCALARBYTES)
+#define OPAQUE_MAX_EXTRA_BYTES 1024*1024 // 1 MB should be enough for even most PQ params
 
 /*
    This function implements the storePwdFile function from the
@@ -32,7 +32,7 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *
   pub output parameter. The User should protect the sec value until later in
   the protocol and send the pub value over to the Server.
  */
-void opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN]);
+int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN]);
 
 /*
   This is the same function as defined in the paper with the srvSession name. It runs
@@ -58,12 +58,6 @@ int opaque_session_srv(const unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN], 
 */
 int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra, uint8_t rwd[crypto_secretbox_KEYBYTES]);
 
-/*
- * This is a simple utility function that can be used to calculate
- * f_k(c), where c is a constant, this is useful if the peers want to
- * authenticate each other.
- */
-void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *res);
 //todo: opaque_session_srv3
 
 /* Alternative user initialization
@@ -84,7 +78,7 @@ void opaque_f(const uint8_t *k, const size_t k_len, const uint8_t val, uint8_t *
  * step 3 of this registration protocol and the value alpha should be
  * passed to the server.
  */
-void opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *alpha);
+int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *alpha);
 
 /*
  * The server receives alpha from the users invocation of its

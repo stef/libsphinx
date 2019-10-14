@@ -1,5 +1,5 @@
 /*
-    @copyright 2018, pitchfork@ctrlc.hu
+    @copyright 2018-19, pitchfork@ctrlc.hu
     This file is part of pitchforked sphinx.
 
     pitchforked sphinx is free software: you can redistribute it and/or
@@ -19,87 +19,80 @@
     as specified on page 18 of: https://eprint.iacr.org/2015/1099
 */
 
-#include <stdint.h>
-#include <string.h>
-#include "decaf.h"
-#include <crypto_generichash.h>
-#include <randombytes.h>
-#include <sodium/utils.h>
+#include "common.h"
 
 // server shares pk as P_s with client_init
 void pake_server_init(uint8_t *p_s, uint8_t *P_s) {
-  randombytes(p_s, DECAF_X25519_PRIVATE_BYTES); // random secret key
-  decaf_x25519_derive_public_key(P_s, p_s);
-}
-
-static void oprf(const uint8_t *x, const size_t x_len, const uint8_t *k, uint8_t *res) {
-  // F_k(x) = H(x, (H0(x))^k) for key k ∈ Z_q
-
-  // hash x with H0
-  uint8_t h0[32];
-  crypto_generichash(h0, sizeof h0, x, x_len, 0, 0);
-  decaf_255_point_t H0;
-  decaf_255_point_from_hash_nonuniform(H0, h0);
-
-  // k -> Z_q
-  decaf_255_scalar_t K;
-  decaf_255_scalar_decode_long(K, k, DECAF_255_SCALAR_BYTES);
-
-  // H0 ^ k
-  decaf_255_point_t H0_k;
-  decaf_255_point_scalarmul(H0_k, H0, K);
-  decaf_255_scalar_destroy(K);
-  decaf_255_point_destroy(H0);
-
-  // h0 := (H0(x))^k
-  decaf_255_point_encode(h0, H0_k);
-  decaf_255_point_destroy(H0_k);
-
-  crypto_generichash_state state;
-  crypto_generichash_init(&state, 0, 0, 32);
-  crypto_generichash_update(&state, x, x_len);
-  crypto_generichash_update(&state, h0, 32);
-  crypto_generichash_final(&state, res, 32);
-  decaf_bzero(&state, sizeof(state));
-  decaf_bzero(h0, sizeof(h0));
+  randombytes(p_s, crypto_scalarmult_SCALARBYTES); // random secret key
+  crypto_scalarmult_base(P_s, p_s);
+#ifdef TRACE
+  dump(p_s, 32, "p_s");
+  dump(P_s, 32, "P_s");
+#endif
 }
 
 // sends c, C, k_s , P_u , m_u to server
-void pake_client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_s,  // input params
+int pake_client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_s,  // input params
                         uint8_t k_s[32], uint8_t c[32], uint8_t C[32], uint8_t P_u[32], uint8_t m_u[32]) { // output params
   uint8_t z[32], tmp[32];
+  sodium_mlock(z,sizeof z);
   // U chooses z ∈_R {0, 1}^τ
-  randombytes(z, 32);
+  crypto_core_ristretto255_scalar_random(z);
   // k_s ∈_R Z_q
-  randombytes(k_s, 32);
+  crypto_core_ristretto255_scalar_random(k_s);
+#ifdef TRACE
+  dump(z, 32, "z");
+  dump(k_s, 32, "k_s");
+#endif
 
   // c = z ⊕ F_k_s(rwd)
-  oprf(rwd, rwd_len, k_s, c);
+  if(0!=sphinx_oprf(rwd, rwd_len, k_s, c)) return -1;
+#ifdef TRACE
+  dump(c, 32, "c");
+#endif
   int i, *ci=(int*) c, *zi=(int*) z;
   for(i=0;i<8;i++) ci[i]^=zi[i];
+#ifdef TRACE
+  dump(c, 32, "ci");
+#endif
 
   // r = f_z(0)
   uint8_t r[32];
+  sodium_mlock(r,sizeof r);
   memset(tmp,0,32);
   crypto_generichash(r, 32, tmp, 32, z, 32);
+#ifdef TRACE
+  dump(r, 32, "r");
+#endif
 
   // C = H(r, rwd, c)
   crypto_generichash_state state;
+  sodium_mlock(&state,sizeof state);
   crypto_generichash_init(&state, 0, 0, 32);
   crypto_generichash_update(&state, r, 32);
   crypto_generichash_update(&state, rwd, rwd_len);
   crypto_generichash_update(&state, c, 32);
   crypto_generichash_final(&state, C, 32);
-  decaf_bzero(r, sizeof(r));
+  sodium_munlock(r, sizeof(r));
+#ifdef TRACE
+  dump(C, 32, "C");
+#endif
 
   // p_u = f_z(1) mod q
-  uint8_t p_u[DECAF_X25519_PRIVATE_BYTES];
+  uint8_t p_u[crypto_scalarmult_SCALARBYTES];
+  sodium_mlock(p_u, sizeof(p_u));
   memset(tmp,1,32);
-  crypto_generichash(p_u, DECAF_X25519_PRIVATE_BYTES, tmp, 32, z, 32);
+  crypto_generichash(p_u, crypto_scalarmult_SCALARBYTES, tmp, 32, z, 32);
+#ifdef TRACE
+  dump(p_u, 32, "p_u");
+#endif
 
   // computes P_u = g^p_u
-  decaf_x25519_derive_public_key(P_u, p_u);
-  decaf_bzero(p_u, sizeof(p_u));
+  crypto_scalarmult_base(P_u, p_u);
+#ifdef TRACE
+  dump(P_u, 32, "P_u");
+#endif
+  sodium_munlock(p_u, sizeof(p_u));
 
   // m_u = f_z (2, P_u, P_s)
   memset(tmp,2,32);
@@ -108,64 +101,34 @@ void pake_client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P
   crypto_generichash_update(&state, P_u, 32);
   crypto_generichash_update(&state, P_s, 32);
   crypto_generichash_final(&state, m_u, 32);
-  decaf_bzero(&state, sizeof(state));
-  decaf_bzero(z, sizeof(z));
+  sodium_munlock(&state, sizeof(state));
+  sodium_munlock(z, sizeof(z));
+#ifdef TRACE
+  dump(m_u, 32, "m_u");
+#endif
+  return 0;
 }
 
 // done by user
-void pake_start_pake(const uint8_t *rwd, const size_t rwd_len, // input params
+int pake_start_pake(const uint8_t *rwd, const size_t rwd_len,   // input params
                        uint8_t alpha[32], uint8_t x_u[32],      // output params
-                       uint8_t X_u[32], uint8_t sp[32]) {
-  // choose ρ, x_u ← Z_q
-  randombytes(sp, 32);
-  decaf_255_scalar_t p;
-  decaf_255_scalar_decode_long(p, sp, 32);
+                       uint8_t X_u[32], uint8_t p[32]) {
 
-  randombytes(x_u, DECAF_X25519_PRIVATE_BYTES);
 
-  // α = (H0(rwd))^ρ
-  uint8_t h0[32];
-  crypto_generichash(h0, sizeof h0, rwd, rwd_len, 0, 0);
-  decaf_255_point_t H0;
-  decaf_255_point_from_hash_nonuniform(H0, h0);
-  decaf_bzero(h0, sizeof(h0));
-  decaf_255_point_scalarmul(H0, H0, p);
-  decaf_255_scalar_destroy(p);
-  decaf_255_point_encode(alpha, H0);
-  decaf_255_point_destroy(H0);
-
+  // blind rwd with q
+  if(0!=sphinx_blindPW(rwd, rwd_len, p, alpha)) {
+    return -1;
+  }
+  // choose x_u ← Z_q
+  randombytes(x_u, crypto_scalarmult_SCALARBYTES);
+#ifdef TRACE
+  dump(x_u, 32, "x_u");
+#endif
   // X_u = g^x_u
-  decaf_x25519_derive_public_key(X_u, x_u);
-}
-
-static void derive_secret(uint8_t *mk, const uint8_t *sec) {
-  // workaround hash sec from 96 bytes down to 64,
-  // as blake can only handle 64 as a key
-  uint8_t hashkey[64];
-  crypto_generichash(hashkey, sizeof hashkey, sec, 96, 0, 0);
-
-  // and hash for the result SK = f_K(0)
-  uint8_t zero[32];
-  memset(zero,0,32);
-  crypto_generichash(mk, DECAF_X25519_PUBLIC_BYTES,  // output
-                     zero, 32,                       // msg
-                     hashkey, sizeof(hashkey));      // key
-
-  decaf_bzero(hashkey, sizeof(hashkey));
-}
-
-static int server_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], const uint8_t Ip[32], const uint8_t Ep[32]) {
-  uint8_t sec[DECAF_X25519_PUBLIC_BYTES * 3], *ptr = sec;
-
-  if(DECAF_SUCCESS!=decaf_x25519(ptr,Ep,ix)) return 1;
-  ptr+=DECAF_X25519_PUBLIC_BYTES;
-  if(DECAF_SUCCESS!=decaf_x25519(ptr,Ip,ex)) return 1;
-  ptr+=DECAF_X25519_PUBLIC_BYTES;
-  if(DECAF_SUCCESS!=decaf_x25519(ptr,Ep,ex)) return 1;
-
-  derive_secret(mk, sec);
-
-  decaf_bzero(sec,sizeof(sec));
+  crypto_scalarmult_base(X_u, x_u);
+#ifdef TRACE
+  dump(X_u, 32, "X_u");
+#endif
   return 0;
 }
 
@@ -173,103 +136,126 @@ static int server_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], c
 //            c, C, P_u , m_u, (received from U in init)
 //            P_s (from server init),
 //            X_s (from here)
-int pake_server_pake(const uint8_t alpha[32], const uint8_t X_u[32],  // input params
+int pake_server_pake(const uint8_t alpha[32], const uint8_t X_u[32],    // input params
                        const uint8_t k_s[32], const uint8_t P_u[32],
                        const uint8_t p_s[32],
                        uint8_t beta[32], uint8_t X_s[32],               // output params
-                       uint8_t SK[DECAF_X25519_PUBLIC_BYTES]) {         // this is the final result: shared secret from the PAKE
-  decaf_255_point_t Alpha;
-  if(DECAF_SUCCESS!=decaf_255_point_decode(Alpha, alpha, DECAF_FALSE)) return 1;
+                       uint8_t SK[crypto_generichash_BYTES]) {          // this is the final result: shared secret from the PAKE
+  if(0==crypto_core_ristretto255_is_valid_point(alpha)) return 1;
 
   // Picks x_s ∈_R Z_q
-  uint8_t x_s[DECAF_X25519_PRIVATE_BYTES];
-  randombytes(x_s, DECAF_X25519_PRIVATE_BYTES); // random secret key
+  uint8_t x_s[crypto_scalarmult_SCALARBYTES];
+  sodium_mlock(x_s, sizeof x_s);
+  randombytes(x_s, crypto_scalarmult_SCALARBYTES); // random secret key
+#ifdef TRACE
+  dump(x_s, 32, "x_s");
+#endif
 
   // computes β = α^k_s
-  decaf_255_point_t Beta;
-  decaf_255_scalar_t K_s;
-  decaf_255_scalar_decode_long(K_s, k_s, 32);
-  decaf_255_point_scalarmul(Beta, Alpha, K_s);
-  decaf_255_point_destroy(Alpha);
-  decaf_255_scalar_destroy(K_s);
-  decaf_255_point_encode(beta, Beta);
-  decaf_255_point_destroy(Beta);
+  if (crypto_scalarmult_ristretto255(beta, k_s, alpha) != 0) {
+    return -1;
+  }
+#ifdef TRACE
+  dump(beta, 32, "beta");
+#endif
 
   // X_s = g^x_s
-  decaf_x25519_derive_public_key(X_s, x_s);
+  crypto_scalarmult_base(X_s, x_s);
+#ifdef TRACE
+  dump(X_s, 32, "X_s");
+#endif
 
   // Computes K = KE(p_s , x_s , P_u , X_u)
   // and outputs session key SK = f_K(0)
-  server_kex(SK, p_s, x_s, P_u, X_u);
-  decaf_bzero(x_s, sizeof(x_s));
+  if(0!=sphinx_server_3dh(SK, p_s, x_s, P_u, X_u)) {
+    return -1;
+  }
+  sodium_munlock(x_s, sizeof(x_s));
 
   return 0;
 }
 
-static int user_kex(uint8_t *mk, const uint8_t ix[32], const uint8_t ex[32], const uint8_t Ip[32], const uint8_t Ep[32]) {
-  uint8_t sec[DECAF_X25519_PUBLIC_BYTES * 3], *ptr = sec;
-
-  if(DECAF_SUCCESS!=decaf_x25519(ptr,Ip,ex)) return 1;
-  ptr+=DECAF_X25519_PUBLIC_BYTES;
-  if(DECAF_SUCCESS!=decaf_x25519(ptr,Ep,ix)) return 1;
-  ptr+=DECAF_X25519_PUBLIC_BYTES;
-  if(DECAF_SUCCESS!=decaf_x25519(ptr,Ep,ex)) return 1;
-
-  // and hash for the result SK = f_K(0)
-  derive_secret(mk, sec);
-  decaf_bzero(sec,sizeof(sec));
-  return 0;
-}
-
-int pake_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
+int pake_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t p[32],
                      const uint8_t x_u[32], const uint8_t beta[32], const uint8_t c[32],
                      const uint8_t C[32], const uint8_t P_u[32], const uint8_t m_u[32],
                      const uint8_t P_s[32], const uint8_t X_s[32],
-                     uint8_t SK[DECAF_X25519_PUBLIC_BYTES]) {
+                     uint8_t SK[crypto_generichash_BYTES]) {
   // note: β, c, C, P_u , m_u , P_s , X_s are sent by server_pake
-  // sp(==p) is from start_pake
+  // p is from start_pake
   // Sets z = c ⊕ H(rwd, β^(1/ρ)), r = f_z(0), p_u = f_z (1) mod q.
+
+  if(crypto_core_ristretto255_is_valid_point(beta)==0) {
+    return -1;
+  }
 
   // calculate z
   // z = c ⊕ H(rwd, β^(1/ρ))
-  decaf_255_scalar_t p;
-  decaf_255_scalar_decode_long(p, sp, 32);
   // p = 1/p
-  if(decaf_255_scalar_invert(p, p)!=DECAF_SUCCESS) return 1;
+#ifdef TRACE
+  dump(p, 32, "p");
+#endif
+  unsigned char ip[crypto_core_ristretto255_SCALARBYTES];
+  sodium_mlock(ip, sizeof(ip));
+  if (crypto_core_ristretto255_scalar_invert(ip, p) != 0) {
+    return -1;
+  }
+#ifdef TRACE
+  dump(ip, 32, "ip");
+#endif
 
   // H0 = β^(1/ρ)
-  decaf_255_point_t H0, Beta;
-  if(DECAF_SUCCESS!=decaf_255_point_decode(Beta, beta, DECAF_FALSE)) return 1;
-  decaf_255_point_scalarmul(H0, Beta, p);
-  decaf_255_scalar_destroy(p);
-  decaf_255_point_destroy(Beta);
-  uint8_t h0[32], h[32];
-  decaf_255_point_encode(h0, H0);
-  decaf_255_point_destroy(H0);
+  unsigned char h0[crypto_core_ristretto255_BYTES];
+  sodium_mlock(h0, sizeof(h0));
+  if (crypto_scalarmult_ristretto255(h0, ip, beta) != 0) {
+    sodium_munlock(ip, sizeof(ip));
+    return -1;
+  }
+  sodium_munlock(ip, sizeof(ip));
+#ifdef TRACE
+  dump(h0, 32, "h0");
+#endif
+  uint8_t h[32];
+  sodium_mlock(h, sizeof h);
 
   // h = H(rwd, β^(1/ρ))
   crypto_generichash_state state;
+  sodium_mlock(&state, sizeof(state));
   crypto_generichash_init(&state, 0, 0, 32);
   crypto_generichash_update(&state, rwd, rwd_len);
   crypto_generichash_update(&state, h0, 32);
   crypto_generichash_final(&state, h, 32);
-  decaf_bzero(h0, sizeof(h0));
+#ifdef TRACE
+  dump(h, 32, "h");
+#endif
+  sodium_munlock(h0, sizeof(h0));
 
   // z = c ⊕ H(rwd, β^(1/ρ))
   uint8_t z[32];
+  sodium_mlock(z, sizeof(z));
   int i, *ci=(int*) c, *zi=(int*) z, *hi=(int*) h;
   for(i=0;i<8;i++) zi[i]=ci[i]^hi[i];
   // end of calculate z
+#ifdef TRACE
+  dump(z, 32, "z");
+#endif
 
   // r = f_z(0)
   uint8_t r[32], tmp[32];
+  sodium_mlock(r,sizeof r);
   memset(tmp,0,32);
   crypto_generichash(r, 32, tmp, 32, z, 32);
+#ifdef TRACE
+  dump(r, 32, "r");
+#endif
 
   // p_u = f_z (1) mod q.
   uint8_t p_u[32];
+  sodium_mlock(p_u,sizeof p_u);
   memset(tmp,1,32);
   crypto_generichash(p_u, 32, tmp, 32, z, 32);
+#ifdef TRACE
+  dump(p_u, 32, "p_u");
+#endif
 
   // abort if  C != H(r, rwd, c) && m_u != f_z(2,P_u,P_s)
 
@@ -279,12 +265,17 @@ int pake_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32
   crypto_generichash_update(&state, rwd, rwd_len);
   crypto_generichash_update(&state, c, 32);
   crypto_generichash_final(&state, h, 32);
-  decaf_bzero(r, sizeof(r));
+#ifdef TRACE
+  dump(h, 32, "h");
+#endif
+  sodium_munlock(r, sizeof(r));
+
   if(sodium_memcmp(h,C,32)!=0) {
-    decaf_bzero(h, sizeof(h));
-    decaf_bzero(&state, sizeof(state));
-    decaf_bzero(z, sizeof(z));
-    decaf_bzero(p_u, sizeof(p_u));
+    sodium_munlock(h, sizeof(h));
+    sodium_munlock(&state, sizeof(state));
+    sodium_munlock(z, sizeof(z));
+    sodium_munlock(p_u, sizeof(p_u));
+    printf("C != H(r, rwd, c)\n");
     return 1;
   }
 
@@ -295,19 +286,24 @@ int pake_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32
   crypto_generichash_update(&state, P_u, 32);
   crypto_generichash_update(&state, P_s, 32);
   crypto_generichash_final(&state, h, 32);
+#ifdef TRACE
+  dump(h, 32, "h");
+#endif
   // abort if m_u != f_z(2,P_u,P_s)
-  decaf_bzero(&state, sizeof(state));
-  decaf_bzero(z, sizeof(z));
+  sodium_munlock(&state, sizeof(state));
+  sodium_munlock(z, sizeof(z));
   if(sodium_memcmp(h,m_u,32)!=0) {
-    decaf_bzero(h, sizeof(h));
-    decaf_bzero(p_u, sizeof(p_u));
+    sodium_munlock(h, sizeof(h));
+    sodium_munlock(p_u, sizeof(p_u));
     return 1;
   }
-  decaf_bzero(h, sizeof(h));
+  sodium_munlock(h, sizeof(h));
 
   // calculate shared secret of PAKE
-  user_kex(SK, p_u, x_u, P_s, X_s);
-  decaf_bzero(p_u, sizeof(p_u));
+  if(0!=sphinx_user_3dh(SK, p_u, x_u, P_s, X_s)) {
+    return -1;
+  }
+  sodium_munlock(p_u, sizeof(p_u));
 
   return 0;
 }

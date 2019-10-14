@@ -16,9 +16,7 @@
     along with pitchforked sphinx. If not, see <http://www.gnu.org/licenses/>.
 */
 #include <stdint.h>
-#include <decaf.h>
-#include <randombytes.h>
-#include <crypto_generichash.h>
+#include <sodium.h>
 #include "sphinx.h"
 
 /* params:
@@ -32,11 +30,13 @@ int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt
   int ret = -1;
   // do the blinding
   uint8_t h0[crypto_core_ristretto255_HASHBYTES];
+  sodium_mlock(h0,sizeof h0);
   // hash x with H0
   crypto_generichash(h0, crypto_core_ristretto255_HASHBYTES, pwd, p_len, salt, salt_len);
   unsigned char H0[crypto_core_ristretto255_BYTES];
+  sodium_mlock(H0,sizeof H0);
   crypto_core_ristretto255_from_hash(H0, h0);
-  sodium_memzero(h0, crypto_core_ristretto255_HASHBYTES);
+  sodium_munlock(h0,sizeof h0);
 
   // random blinding factor
   crypto_core_ristretto255_scalar_random(bfac);
@@ -45,7 +45,7 @@ int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt
   if (crypto_scalarmult_ristretto255(chal, bfac, H0) == 0) {
     ret = 0;
   }
-  sodium_memzero(H0, crypto_core_ristretto255_BYTES);
+  sodium_munlock(H0,sizeof H0);
 
   return ret;
 }
@@ -79,16 +79,20 @@ int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[cry
 
   // resp^(1/bfac) = h(pwd)^secret
   unsigned char H0_k[crypto_core_ristretto255_BYTES];
+  sodium_mlock(H0_k,sizeof H0_k);
   if (crypto_scalarmult_ristretto255(H0_k, ir, resp) != 0) {
     return -1;
   }
 
   // hash(pwd||H0^k)
   crypto_generichash_state state;
+  sodium_mlock(&state,sizeof state);
   crypto_generichash_init(&state, 0, 0, crypto_core_ristretto255_BYTES);
   crypto_generichash_update(&state, pwd, p_len);
   crypto_generichash_update(&state, H0_k, sizeof H0_k);
   crypto_generichash_final(&state, rwd, crypto_core_ristretto255_BYTES);
+  sodium_munlock(H0_k,sizeof H0_k);
+  sodium_munlock(&state,sizeof state);
 
   if (crypto_pwhash(rwd, crypto_core_ristretto255_BYTES, (const char*) rwd, crypto_core_ristretto255_BYTES, salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT) != 0) {
