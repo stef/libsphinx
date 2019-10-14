@@ -30,11 +30,14 @@ int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt
   int ret = -1;
   // do the blinding
   uint8_t h0[crypto_core_ristretto255_HASHBYTES];
-  sodium_mlock(h0,sizeof h0);
+  if(-1==sodium_mlock(h0,sizeof h0)) return -1;
   // hash x with H0
   crypto_generichash(h0, crypto_core_ristretto255_HASHBYTES, pwd, p_len, salt, salt_len);
   unsigned char H0[crypto_core_ristretto255_BYTES];
-  sodium_mlock(H0,sizeof H0);
+  if(-1==sodium_mlock(H0,sizeof H0)) {
+    sodium_munlock(h0,sizeof h0);
+    return -1;
+  }
   crypto_core_ristretto255_from_hash(H0, h0);
   sodium_munlock(h0,sizeof h0);
 
@@ -73,20 +76,28 @@ int sphinx_respond(const uint8_t chal[crypto_core_ristretto255_BYTES], const uin
 int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[crypto_core_ristretto255_SCALARBYTES], const uint8_t resp[crypto_core_ristretto255_BYTES], const uint8_t salt[crypto_pwhash_SALTBYTES], uint8_t rwd[crypto_core_ristretto255_BYTES]) {
   // invert bfac = 1/bfac
   unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
+  if(0!=sodium_mlock(ir,sizeof ir)) return -1;
   if (crypto_core_ristretto255_scalar_invert(ir, bfac) != 0) {
+    sodium_munlock(ir, sizeof ir);
     return -1;
   }
 
   // resp^(1/bfac) = h(pwd)^secret
   unsigned char H0_k[crypto_core_ristretto255_BYTES];
-  sodium_mlock(H0_k,sizeof H0_k);
+  if(-1==sodium_mlock(H0_k,sizeof H0_k)) return -1;
   if (crypto_scalarmult_ristretto255(H0_k, ir, resp) != 0) {
+    sodium_munlock(ir, sizeof ir);
+    sodium_munlock(H0_k,sizeof H0_k);
     return -1;
   }
+  sodium_munlock(ir, sizeof ir);
 
   // hash(pwd||H0^k)
   crypto_generichash_state state;
-  sodium_mlock(&state,sizeof state);
+  if(-1==sodium_mlock(&state,sizeof state)) {
+    sodium_munlock(H0_k,sizeof H0_k);
+    return -1;
+  }
   crypto_generichash_init(&state, 0, 0, crypto_core_ristretto255_BYTES);
   crypto_generichash_update(&state, pwd, p_len);
   crypto_generichash_update(&state, H0_k, sizeof H0_k);
@@ -97,7 +108,7 @@ int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[cry
   if (crypto_pwhash(rwd, crypto_core_ristretto255_BYTES, (const char*) rwd, crypto_core_ristretto255_BYTES, salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT) != 0) {
     /* out of memory */
-    return 1;
+    return -1;
   }
 
   return 0;
