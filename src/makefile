@@ -63,6 +63,9 @@ $(PREFIX)/lib/libsphinx.$(SOEXT): libsphinx.$(SOEXT)
 $(PREFIX)/include/sphinx.h: sphinx.h
 	cp $< $@
 
+%.o: %.c
+	$(CC) $(CFLAGS) -o $@ -c $<
+
 clean:
 	rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so
 	rm -f tests/sphinx tests/pake tests/opaque tests/sphinx.exe tests/pake.exe tests/opaque.exe *.o
