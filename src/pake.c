@@ -153,6 +153,7 @@ int pake_server_pake(const uint8_t alpha[32], const uint8_t X_u[32],    // input
 
   // computes β = α^k_s
   if (crypto_scalarmult_ristretto255(beta, k_s, alpha) != 0) {
+    sodium_munlock(x_s, sizeof(x_s));
     return -1;
   }
 #ifdef TRACE
@@ -168,6 +169,7 @@ int pake_server_pake(const uint8_t alpha[32], const uint8_t X_u[32],    // input
   // Computes K = KE(p_s , x_s , P_u , X_u)
   // and outputs session key SK = f_K(0)
   if(0!=sphinx_server_3dh(SK, p_s, x_s, P_u, X_u)) {
+    sodium_munlock(x_s, sizeof(x_s));
     return -1;
   }
   sodium_munlock(x_s, sizeof(x_s));
@@ -197,6 +199,7 @@ int pake_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t p[32]
   unsigned char ip[crypto_core_ristretto255_SCALARBYTES];
   sodium_mlock(ip, sizeof(ip));
   if (crypto_core_ristretto255_scalar_invert(ip, p) != 0) {
+    sodium_munlock(ip, sizeof(ip));
     return -1;
   }
 #ifdef TRACE
@@ -207,6 +210,7 @@ int pake_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t p[32]
   unsigned char h0[crypto_core_ristretto255_BYTES];
   sodium_mlock(h0, sizeof(h0));
   if (crypto_scalarmult_ristretto255(h0, ip, beta) != 0) {
+    sodium_munlock(h0, sizeof(h0));
     sodium_munlock(ip, sizeof(ip));
     return -1;
   }
