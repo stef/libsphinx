@@ -25,6 +25,7 @@
  * salt, salt_len: (input) salt for hashing the password, can both be NULL/0
  * bfac: (output) pointer to array of crypto_core_ristretto255_SCALARBYTES (32) bytes - the blinding factor
  * chal: (output) pointer to array of crypto_core_ristretto255_BYTES (32) bytes - the challenge
+ * returns -1 on error, 0 on success
  */
 int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt, const size_t salt_len, uint8_t bfac[crypto_core_ristretto255_SCALARBYTES], uint8_t chal[crypto_core_ristretto255_BYTES]) {
   int ret = -1;
@@ -57,9 +58,11 @@ int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt
  * chal: (input) the challenge, crypto_core_ristretto255_BYTES(32) bytes array
  * secret: (input) the secret contributing, crypto_core_ristretto255_SCALARBYTES (32) bytes array
  * resp: (output) the response, crypto_core_ristretto255_BYTES (32) bytes array
- * returns 1 on error, 0 on success
+ * returns -1 on error, 0 on success
  */
 int sphinx_respond(const uint8_t chal[crypto_core_ristretto255_BYTES], const uint8_t secret[crypto_core_ristretto255_SCALARBYTES], uint8_t resp[crypto_core_ristretto255_BYTES]) {
+  // Checks that chal ∈ G^∗ . If not, abort;
+  if(crypto_core_ristretto255_is_valid_point(chal)!=1) return -1;
   // server contributes k
   return crypto_scalarmult_ristretto255(resp, secret, chal);
 }
@@ -71,9 +74,12 @@ int sphinx_respond(const uint8_t chal[crypto_core_ristretto255_BYTES], const uin
  * resp: (input) the response from respond(), crypto_core_ristretto255_BYTES (32) bytes array
  * salt: (input) salt for the final password hashing, crypto_pwhash_SALTBYTES bytes array
  * rwd: (output) the derived password, crypto_core_ristretto255_BYTES (32) bytes array
- * returns 1 on error, 0 on success
+ * returns -1 on error, 0 on success
  */
 int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[crypto_core_ristretto255_SCALARBYTES], const uint8_t resp[crypto_core_ristretto255_BYTES], const uint8_t salt[crypto_pwhash_SALTBYTES], uint8_t rwd[crypto_core_ristretto255_BYTES]) {
+  // Checks that resp ∈ G^∗ . If not, abort;
+  if(crypto_core_ristretto255_is_valid_point(resp)!=1) return -1;
+
   // invert bfac = 1/bfac
   unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
   if(0!=sodium_mlock(ir,sizeof ir)) return -1;
@@ -82,7 +88,7 @@ int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[cry
     return -1;
   }
 
-  // resp^(1/bfac) = h(pwd)^secret
+  // resp^(1/bfac) = h(pwd)^secret == H0^k
   unsigned char H0_k[crypto_core_ristretto255_BYTES];
   if(-1==sodium_mlock(H0_k,sizeof H0_k)) return -1;
   if (crypto_scalarmult_ristretto255(H0_k, ir, resp) != 0) {
