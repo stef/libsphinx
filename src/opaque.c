@@ -79,7 +79,7 @@ typedef struct {
 
 // (StorePwdFile, sid , U, pw): S computes k_s ←_R Z_q , rw := F_k_s (pw),
 // p_s ←_R Z_q , p_u ←_R Z_q , P_s := g^p_s , P_u := g^p_u , c ← AuthEnc_rw (p_u, P_u, P_s);
-// it records file[sid ] := {k_s, p_s, P_s, P_u, c}.
+// it records file[sid] := {k_s, p_s, P_s, P_u, c}.
 int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_UserRecord *rec = (Opaque_UserRecord *)_rec;
 
@@ -109,9 +109,6 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *
 
 #ifdef TRACE
   dump((uint8_t*) rw, 32, "key ");
-#endif
-
-#ifdef TRACE
   dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
 #endif
   // p_s ←_R Z_q
