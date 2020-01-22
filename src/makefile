@@ -55,12 +55,15 @@ win/libsodium-win64:
 	@echo 'https://download.libsodium.org/libsodium/releases/'
 	@false
 
-install: $(PREFIX)/lib/libsphinx.$(SOEXT) $(PREFIX)/include/sphinx.h
+install: $(PREFIX)/lib/libsphinx.$(SOEXT) $(PREFIX)/include/sphinx.h $(PREFIX)/include/opaque.h
 
 $(PREFIX)/lib/libsphinx.$(SOEXT): libsphinx.$(SOEXT)
 	cp $< $@
 
 $(PREFIX)/include/sphinx.h: sphinx.h
+	cp $< $@
+
+$(PREFIX)/include/opaque.h: opaque.h
 	cp $< $@
 
 %.o: %.c
