@@ -1,7 +1,7 @@
 PREFIX?=/usr/local
 INC=-I/usr/include/sodium
 LIBS=-lsodium
-CFLAGS=$(INC) -Wall -fPIC -fPIE -O3 -g
+CFLAGS=$(INC) -Wall -fPIC -fPIE -O3 -g #-DTRACE
 LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
