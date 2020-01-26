@@ -21,13 +21,14 @@
 #include "../opaque.h"
 #include "../common.h"
 
-static void dump(const uint8_t *p, const size_t len, const char* msg) {
+static void _dump(const uint8_t *p, const size_t len, const char* msg) {
   int i;
   printf("%s",msg);
   for(i=0;i<len;i++)
     printf("%02x", p[i]);
   printf("\n");
 }
+
 
 int main(void) {
   uint8_t pw[]="simple guessable dictionary password";
@@ -50,7 +51,7 @@ int main(void) {
   printf("srvSession\n");
   if(0!=opaque_session_srv(pub, rec, resp, sk)) return 1;
 
-  dump(sk,32,"sk_s: ");
+  _dump(sk,32,"sk_s: ");
 
   uint8_t pk[32];
   printf("usrSessionEnd\n");
@@ -58,8 +59,8 @@ int main(void) {
   extra_recovered[extra_len]=0;
   if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered, rwd)) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);
-  dump(rwd,32,"rwd: ");
-  dump(pk,32,"sk_u: ");
+  _dump(rwd,32,"rwd: ");
+  _dump(pk,32,"sk_u: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
 
   // variant where user registration does not leak secrets to server
@@ -84,11 +85,11 @@ int main(void) {
   opaque_session_usr_start(pw, pwlen, sec, pub);
   printf("srvSession\n");
   if(0!=opaque_session_srv(pub, rrec, resp, sk)) return 1;
-  dump(sk,32,"sk_s: ");
+  _dump(sk,32,"sk_s: ");
   printf("userSessionEnd\n");
   if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, pk, extra_recovered, rwd)) return 1;
-  dump(pk,32,"sk_u: ");
-  dump(rwd,32,"rwd: ");
+  _dump(pk,32,"sk_u: ");
+  _dump(rwd,32,"rwd: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
   printf("recovered extra data: \"%s\"\n", extra_recovered);
 
@@ -100,8 +101,8 @@ int main(void) {
   uint8_t su[32], us[32];
   sphinx_f(sk, sizeof sk, '1', su);
   sphinx_f(pk, sizeof pk, '1', us);
-  dump(su, 32, "f_sk(1): ");
-  dump(us, 32, "f_pk(1): ");
+  _dump(su, 32, "f_sk(1): ");
+  _dump(us, 32, "f_pk(1): ");
   assert(0==sodium_memcmp(su,us,32));
 
   // to authenticate the user to the server, the user sends f_pk(2)
@@ -109,8 +110,8 @@ int main(void) {
   // value as sent by the user.
   sphinx_f(pk, sizeof pk, '2', us);
   sphinx_f(sk, sizeof sk, '2', su);
-  dump(us, 32, "f_pk(2): ");
-  dump(su, 32, "f_sk(2): ");
+  _dump(us, 32, "f_pk(2): ");
+  _dump(su, 32, "f_sk(2): ");
   assert(0==sodium_memcmp(su,us,32));
 
   return 0;
