@@ -18,6 +18,9 @@
 #include <stdint.h>
 #include <sodium.h>
 #include "sphinx.h"
+#ifdef TRACE
+#include "common.h"
+#endif
 
 /* params:
  *
@@ -29,11 +32,18 @@
  */
 int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt, const size_t salt_len, uint8_t bfac[crypto_core_ristretto255_SCALARBYTES], uint8_t chal[crypto_core_ristretto255_BYTES]) {
   int ret = -1;
+#ifdef TRACE
+  dump(pwd, p_len, "pwd");
+  dump(salt, salt_len, "salt");
+#endif
   // do the blinding
   uint8_t h0[crypto_core_ristretto255_HASHBYTES];
   if(-1==sodium_mlock(h0,sizeof h0)) return -1;
   // hash x with H0
   crypto_generichash(h0, crypto_core_ristretto255_HASHBYTES, pwd, p_len, salt, salt_len);
+#ifdef TRACE
+  dump(h0, sizeof h0, "h0");
+#endif
   unsigned char H0[crypto_core_ristretto255_BYTES];
   if(-1==sodium_mlock(H0,sizeof H0)) {
     sodium_munlock(h0,sizeof h0);
@@ -41,15 +51,24 @@ int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt
   }
   crypto_core_ristretto255_from_hash(H0, h0);
   sodium_munlock(h0,sizeof h0);
+#ifdef TRACE
+  dump(H0, sizeof H0, "H0");
+#endif
 
   // random blinding factor
   crypto_core_ristretto255_scalar_random(bfac);
+#ifdef TRACE
+  dump(bfac, crypto_core_ristretto255_SCALARBYTES, "r");
+#endif
 
   // chal = H0^r
   if (crypto_scalarmult_ristretto255(chal, bfac, H0) == 0) {
     ret = 0;
   }
   sodium_munlock(H0,sizeof H0);
+#ifdef TRACE
+  dump(chal, crypto_core_ristretto255_BYTES, "alpha");
+#endif
 
   return ret;
 }
@@ -61,10 +80,21 @@ int sphinx_challenge(const uint8_t *pwd, const size_t p_len, const uint8_t *salt
  * returns -1 on error, 0 on success
  */
 int sphinx_respond(const uint8_t chal[crypto_core_ristretto255_BYTES], const uint8_t secret[crypto_core_ristretto255_SCALARBYTES], uint8_t resp[crypto_core_ristretto255_BYTES]) {
+#ifdef TRACE
+  dump(chal, crypto_core_ristretto255_BYTES, "alpha");
+#endif
+#ifdef TRACE
+  dump(secret, crypto_core_ristretto255_SCALARBYTES, "k");
+#endif
   // Checks that chal ∈ G^∗ . If not, abort;
   if(crypto_core_ristretto255_is_valid_point(chal)!=1) return -1;
   // server contributes k
-  return crypto_scalarmult_ristretto255(resp, secret, chal);
+
+  int ret = crypto_scalarmult_ristretto255(resp, secret, chal);
+#ifdef TRACE
+  dump(resp, crypto_core_ristretto255_BYTES, "beta");
+#endif
+  return ret;
 }
 
 /* params
@@ -77,6 +107,12 @@ int sphinx_respond(const uint8_t chal[crypto_core_ristretto255_BYTES], const uin
  * returns -1 on error, 0 on success
  */
 int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[crypto_core_ristretto255_SCALARBYTES], const uint8_t resp[crypto_core_ristretto255_BYTES], const uint8_t salt[crypto_pwhash_SALTBYTES], uint8_t rwd[crypto_core_ristretto255_BYTES]) {
+#ifdef TRACE
+  dump(bfac, crypto_core_ristretto255_SCALARBYTES, "r");
+  dump(resp, crypto_core_ristretto255_BYTES, "beta");
+  dump(pwd, p_len, "pwd");
+  dump(salt, crypto_pwhash_SALTBYTES, "salt");
+#endif
   // Checks that resp ∈ G^∗ . If not, abort;
   if(crypto_core_ristretto255_is_valid_point(resp)!=1) return -1;
 
@@ -87,6 +123,9 @@ int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[cry
     sodium_munlock(ir, sizeof ir);
     return -1;
   }
+#ifdef TRACE
+  dump(ir, crypto_core_ristretto255_SCALARBYTES, "ir");
+#endif
 
   // resp^(1/bfac) = h(pwd)^secret == H0^k
   unsigned char H0_k[crypto_core_ristretto255_BYTES];
@@ -97,6 +136,9 @@ int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[cry
     return -1;
   }
   sodium_munlock(ir, sizeof ir);
+#ifdef TRACE
+  dump(H0_k, crypto_core_ristretto255_BYTES, "H0_k");
+#endif
 
   // hash(pwd||H0^k)
   crypto_generichash_state state;
@@ -107,15 +149,30 @@ int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[cry
   crypto_generichash_init(&state, 0, 0, crypto_core_ristretto255_BYTES);
   crypto_generichash_update(&state, pwd, p_len);
   crypto_generichash_update(&state, H0_k, sizeof H0_k);
-  crypto_generichash_final(&state, rwd, crypto_core_ristretto255_BYTES);
-  sodium_munlock(H0_k,sizeof H0_k);
-  sodium_munlock(&state,sizeof state);
 
-  if (crypto_pwhash(rwd, crypto_core_ristretto255_BYTES, (const char*) rwd, crypto_core_ristretto255_BYTES, salt,
-       crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT) != 0) {
-    /* out of memory */
+  uint8_t rwd0[crypto_core_ristretto255_BYTES];
+  if(-1==sodium_mlock(&rwd0,sizeof rwd0)) {
+    sodium_munlock(H0_k,sizeof H0_k);
+    sodium_munlock(&state,sizeof state);
     return -1;
   }
+  crypto_generichash_final(&state, rwd0, crypto_core_ristretto255_BYTES);
+  sodium_munlock(H0_k,sizeof H0_k);
+  sodium_munlock(&state,sizeof state);
+#ifdef TRACE
+  dump(rwd0, crypto_core_ristretto255_BYTES, "rwd0");
+#endif
+
+  if (crypto_pwhash(rwd, crypto_core_ristretto255_BYTES, (const char*) rwd0, crypto_core_ristretto255_BYTES, salt,
+       crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT) != 0) {
+    /* out of memory */
+    sodium_munlock(rwd0,sizeof rwd0);
+    return -1;
+  }
+  sodium_munlock(rwd0,sizeof rwd0);
+#ifdef TRACE
+  dump(rwd, crypto_core_ristretto255_BYTES, "rwd");
+#endif
 
   return 0;
 }
