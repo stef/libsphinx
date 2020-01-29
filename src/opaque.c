@@ -80,7 +80,10 @@ typedef struct {
 // (StorePwdFile, sid , U, pw): S computes k_s ←_R Z_q , rw := F_k_s (pw),
 // p_s ←_R Z_q , p_u ←_R Z_q , P_s := g^p_s , P_u := g^p_u , c ← AuthEnc_rw (p_u, P_u, P_s);
 // it records file[sid] := {k_s, p_s, P_s, P_u, c}.
-int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
+                    const uint8_t *extra, const uint64_t extra_len,
+                    const uint8_t *key, const uint64_t key_len,
+                    uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_UserRecord *rec = (Opaque_UserRecord *)_rec;
 
   // k_s ←_R Z_q
@@ -89,7 +92,7 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *
   // rw := F_k_s (pw),
   uint8_t rw[32];
   if(-1==sodium_mlock(rw,sizeof rw)) return -1;
-  if(sphinx_oprf(pw, pwlen, rec->k_s, rw)!=0) {
+  if(sphinx_oprf(pw, pwlen, rec->k_s, key, key_len, rw)!=0) {
     sodium_munlock(rw,sizeof rw);
     return -1;
   }
@@ -172,7 +175,7 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *
 
 //(UsrSession, sid , ssid , S, pw): U picks r, x_u ←_R Z_q ; sets α := (H^0(pw))^r and
 //X_u := g^x_u ; sends α and X_u to S.
-int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
+int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret*) _sec;
   Opaque_UserSession *pub = (Opaque_UserSession*) _pub;
 
@@ -201,7 +204,7 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, unsigned cha
 // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f K (0);
 // (e) Sends β, X s and c to U;
 // (f) Outputs (sid , ssid , SK).
-int opaque_session_srv(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const unsigned char _rec[OPAQUE_USER_RECORD_LEN], unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], uint8_t *sk) {
+int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const uint8_t _rec[OPAQUE_USER_RECORD_LEN], uint8_t _resp[OPAQUE_SERVER_SESSION_LEN], uint8_t *sk) {
   Opaque_UserSession *pub = (Opaque_UserSession *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
@@ -255,12 +258,18 @@ int opaque_session_srv(const unsigned char _pub[OPAQUE_USER_SESSION_PUBLIC_LEN],
 
 // 3. On β, X_s and c from S, U proceeds as follows:
 // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
-// (b) Computes rw := H(pw, β^1/r );
+// (b) Computes rw := H(key, pw|β^1/r );
 // (c) Computes AuthDec_rw(c). If the result is ⊥, outputs (abort, sid , ssid ) and halts.
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsigned char _resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra, uint8_t rwd[crypto_secretbox_KEYBYTES]) {
+int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
+                              const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
+                              const uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN],
+                              const uint8_t *key, const uint64_t key_len,
+                              uint8_t *sk,
+                              uint8_t *extra,
+                              uint8_t rwd[crypto_secretbox_KEYBYTES]) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
 
@@ -269,7 +278,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
 
   // (b) Computes rw := H(pw, β^1/r );
   // r = 1/r
-  unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
+  uint8_t ir[crypto_core_ristretto255_SCALARBYTES];
   if(-1==sodium_mlock(ir,sizeof ir)) return -1;
   if (crypto_core_ristretto255_scalar_invert(ir, sec->r) != 0) {
     sodium_munlock(ir,sizeof ir);
@@ -278,7 +287,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
 
   // h0 = β^(1/r)
   // beta^(1/r) = h(pwd)^k
-  unsigned char h0[crypto_core_ristretto255_BYTES];
+  uint8_t h0[crypto_core_ristretto255_BYTES];
   if(-1==sodium_mlock(h0,sizeof h0)) {
     sodium_munlock(ir,sizeof ir);
     return -1;
@@ -302,7 +311,11 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsig
     sodium_munlock(rw,sizeof rw);
     return -1;
   }
-  crypto_generichash_init(&state, 0, 0, 32);
+  if(key != NULL) {
+     crypto_generichash_init(&state, key, key_len, 32);
+  } else {
+     crypto_generichash_init(&state, 0, 0, 32);
+  }
   crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
   crypto_generichash_final(&state, rw, 32);
@@ -386,7 +399,7 @@ int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t
 // (2) generates k_s ←_R Z_q,
 // (3) computes: β := α^k_s,
 // (4) finally generates: p_s ←_R Z_q, P_s := g^p_s;
-int opaque_private_init_srv_respond(const uint8_t *alpha, unsigned char _sec[OPAQUE_REGISTER_SECRET_LEN], unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN]) {
+int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]) {
   Opaque_RegisterSec *sec = (Opaque_RegisterSec *) _sec;
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
 
@@ -412,12 +425,18 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, unsigned char _sec[OPA
 
 // user computes:
 // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
-// (b) Computes rw := H(pw, β^1/r );
+// (b) Computes rw := H(key, pw | β^1/r );
 // (c) generates salt
 // (c) p_u ←_R Z_q
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
-int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char _rec[OPAQUE_USER_RECORD_LEN], uint8_t rwd[crypto_secretbox_KEYBYTES]) {
+int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
+                                    const uint8_t *r,
+                                    const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN],
+                                    const uint8_t *extra, const uint64_t extra_len,    // extra data to be encryped in the blob
+                                    const uint8_t *key, const uint64_t key_len,        // contributes to the final rwd calculation as a key to the hash
+                                    uint8_t _rec[OPAQUE_USER_RECORD_LEN],
+                                    uint8_t rwd[crypto_secretbox_KEYBYTES]) {
 
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
@@ -430,7 +449,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
 
   // (b) Computes rw := H(pw, β^1/r );
   // invert r = 1/r
-  unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
+  uint8_t ir[crypto_core_ristretto255_SCALARBYTES];
   if(-1==sodium_mlock(ir, sizeof ir)) return -1;
   if (crypto_core_ristretto255_scalar_invert(ir, r) != 0) {
     sodium_munlock(ir, sizeof ir);
@@ -439,7 +458,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
 
   // H0 = β^(1/r)
   // beta^(1/r) = h(pwd)^k
-  unsigned char h0[crypto_core_ristretto255_BYTES];
+  uint8_t h0[crypto_core_ristretto255_BYTES];
   if(-1==sodium_mlock(h0,sizeof h0)) {
     sodium_munlock(ir, sizeof ir);
     return -1;
@@ -463,7 +482,11 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
     sodium_munlock(rw, sizeof rw);
     return -1;
   }
-  crypto_generichash_init(&state, 0, 0, 32);
+  if(key != NULL) {
+     crypto_generichash_init(&state, key, key_len, 32);
+  } else {
+     crypto_generichash_init(&state, 0, 0, 32);
+  }
   crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
   crypto_generichash_final(&state, rw, 32);
@@ -531,7 +554,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
 }
 
 // S records file[sid ] := {k_s, p_s, P_s, P_u, c}.
-void opaque_private_init_srv_finish(const unsigned char _sec[OPAQUE_REGISTER_SECRET_LEN], const unsigned char _pub[OPAQUE_REGISTER_PUBLIC_LEN], unsigned char _rec[OPAQUE_USER_RECORD_LEN]) {
+void opaque_private_init_srv_finish(const uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN], uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_RegisterSec *sec = (Opaque_RegisterSec *) _sec;
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;

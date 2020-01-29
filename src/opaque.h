@@ -23,7 +23,7 @@
    user names or as the paper suggests sid.  *Attention* the size of
    rec depends on the size of extra data provided.
  */
-int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *extra, const uint64_t extra_len, unsigned char rec[OPAQUE_USER_RECORD_LEN]);
+int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const uint8_t *extra, const uint64_t extra_len, const uint8_t *key, const uint64_t key_len, uint8_t rec[OPAQUE_USER_RECORD_LEN]);
 
 /*
   This function initiates a new OPAQUE session, is the same as the
@@ -33,7 +33,7 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const unsigned char *
   should protect the sec value until later in the protocol and send
   the pub value over to the Server.
  */
-int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN]);
+int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t pub[OPAQUE_USER_SESSION_PUBLIC_LEN]);
 
 /*
   This is the same function as defined in the paper with the
@@ -45,7 +45,7 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, unsigned cha
   back to the user. *Attention* rec and resp have variable length
   depending on any extra data stored.
  */
-int opaque_session_srv(const unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const unsigned char rec[OPAQUE_USER_RECORD_LEN], unsigned char resp[OPAQUE_SERVER_SESSION_LEN], uint8_t *sk);
+int opaque_session_srv(const uint8_t pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t resp[OPAQUE_SERVER_SESSION_LEN], uint8_t *sk);
 
 /*
  This is the same function as defined in the paper with the
@@ -60,9 +60,7 @@ int opaque_session_srv(const unsigned char pub[OPAQUE_USER_SESSION_PUBLIC_LEN], 
  rwd is not NULL it is returned - this enables to run the sphinx
  protocol in the opaque protocol.
 */
-int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const unsigned char resp[OPAQUE_SERVER_SESSION_LEN], const unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t *sk, uint8_t *extra, uint8_t rwd[crypto_secretbox_KEYBYTES]);
-
-//todo: opaque_session_srv3
+int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const uint8_t resp[OPAQUE_SERVER_SESSION_LEN], const uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *key, const uint64_t key_len, uint8_t *sk, uint8_t *extra, uint8_t rwd[crypto_secretbox_KEYBYTES]);
 
 /* Alternative user initialization
  *
@@ -91,7 +89,7 @@ int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t
  * function also outputs a value pub which needs to be passed to the
  * user.
  */
-int opaque_private_init_srv_respond(const uint8_t *alpha, unsigned char sec[OPAQUE_REGISTER_SECRET_LEN], unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN]);
+int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN]);
 
 /*
  * This function is run by the user, taking as input the users
@@ -99,13 +97,14 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, unsigned char sec[OPAQ
  * running opaque_private_init_usr_start(), and the output pub from
  * the servers run of opaque_private_init_srv_respond(). Futhermore
  * the extra/extra_len parameter can be used to store additional data
- * in the encrypted user record. The result of this is the value rec
- * which should be passed for the last step to the server. *Attention*
- * the size of rec depends on extra data length. If rwd is not NULL it
- * is returned - this enables to run the sphinx protocol in the opaque
- * protocol.
+ * in the encrypted user record. The key parameter can be used as an extra
+ * contribution to the derivation of the rwd by means of being used as a key to
+ * the final hash. The result of this is the value rec which should be
+ * passed for the last step to the server. *Attention* the size of rec
+ * depends on extra data length. If rwd is not NULL it * is returned -
+ * this enables to run the sphinx protocol in the opaque protocol.
  */
-int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN], const unsigned char *extra, const uint64_t extra_len, unsigned char rec[OPAQUE_USER_RECORD_LEN], uint8_t rwd[crypto_secretbox_KEYBYTES]);
+int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], const uint8_t *extra, const uint64_t extra_len, const uint8_t *key, const uint64_t key_len, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t rwd[crypto_secretbox_KEYBYTES]);
 
 /*
  * The server combines the sec value from its run of its
@@ -118,6 +117,6 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
  * extra data length.
  */
 //
-void opaque_private_init_srv_finish(const unsigned char sec[OPAQUE_REGISTER_SECRET_LEN], const unsigned char pub[OPAQUE_REGISTER_PUBLIC_LEN], unsigned char rec[OPAQUE_USER_RECORD_LEN]);
+void opaque_private_init_srv_finish(const uint8_t sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], uint8_t rec[OPAQUE_USER_RECORD_LEN]);
 
 #endif // opaque_h

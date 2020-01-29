@@ -46,7 +46,7 @@ int pake_client_init(const uint8_t *rwd, const size_t rwd_len, const uint8_t *P_
 #endif
 
   // c = z ⊕ F_k_s(rwd)
-  if(0!=sphinx_oprf(rwd, rwd_len, k_s, c)) {
+  if(0!=sphinx_oprf(rwd, rwd_len, k_s, 0, 0, c)) {
     sodium_munlock(z, sizeof(z));
     return -1;
   }

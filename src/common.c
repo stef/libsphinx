@@ -24,7 +24,8 @@ void a_randomscalar(unsigned char* buf) {
 
 int sphinx_oprf(const uint8_t *pwd, const size_t pwd_len,
                 const uint8_t k[crypto_core_ristretto255_SCALARBYTES],
-                uint8_t key[crypto_generichash_BYTES]) {
+                const uint8_t *key, const size_t key_len,
+                uint8_t rwd[crypto_generichash_BYTES]) {
   // F_k(pwd) = H(pwd, (H0(pwd))^k) for key k ∈ Z_q
   uint8_t h0[crypto_core_ristretto255_HASHBYTES];
   sodium_mlock(h0,sizeof h0);
@@ -57,12 +58,16 @@ int sphinx_oprf(const uint8_t *pwd, const size_t pwd_len,
   // hash(pwd||H0^k)
   crypto_generichash_state state;
   sodium_mlock(&state, sizeof state);
-  crypto_generichash_init(&state, 0, 0, 32);
+  if(key != NULL) {
+     crypto_generichash_init(&state, key, key_len, 32);
+  } else {
+     crypto_generichash_init(&state, 0, 0, 32);
+  }
   crypto_generichash_update(&state, pwd, pwd_len);
   crypto_generichash_update(&state, H0_k, sizeof H0_k);
-  crypto_generichash_final(&state, key, 32);
+  crypto_generichash_final(&state, rwd, 32);
 #ifdef TRACE
-  dump(key, 32, "key");
+  dump(rwd, 32, "rwd");
 #endif
   sodium_munlock(H0_k,sizeof H0_k);
   sodium_munlock(&state, sizeof state);

@@ -23,7 +23,8 @@ void a_randomscalar(unsigned char* buf);
 
 int sphinx_oprf(const uint8_t *pwd, const size_t pwd_len,
                 const uint8_t k[crypto_core_ristretto255_SCALARBYTES],
-                uint8_t key[crypto_generichash_BYTES]);
+                const uint8_t *key, const size_t key_len,
+                uint8_t rwd[crypto_generichash_BYTES]);
 int sphinx_server_3dh(uint8_t mk[crypto_generichash_BYTES],
                       const uint8_t ix[crypto_scalarmult_SCALARBYTES],
                       const uint8_t ex[crypto_scalarmult_SCALARBYTES],
