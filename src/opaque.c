@@ -90,25 +90,32 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
   crypto_core_ristretto255_scalar_random(rec->k_s);
 
   // rw := F_k_s (pw),
-  uint8_t rw[32];
-  if(-1==sodium_mlock(rw,sizeof rw)) return -1;
-  if(sphinx_oprf(pw, pwlen, rec->k_s, key, key_len, rw)!=0) {
-    sodium_munlock(rw,sizeof rw);
+  uint8_t rw0[32];
+  if(-1==sodium_mlock(rw0,sizeof rw0)) return -1;
+  if(sphinx_oprf(pw, pwlen, rec->k_s, key, key_len, rw0)!=0) {
+    sodium_munlock(rw0,sizeof rw0);
     return -1;
   }
 
 #ifdef TRACE
-  dump((uint8_t*) rw, 32, "rw ");
+  dump((uint8_t*) rw0, 32, "rw0 ");
 #endif
 
   randombytes(rec->salt, sizeof(rec->salt));
-  if (crypto_pwhash(rw, sizeof rw, (const char*) rw, sizeof rw, rec->salt,
+  uint8_t rw[32];
+  if(-1==sodium_mlock(rw,sizeof rw)) {
+    sodium_munlock(rw0,sizeof rw0);
+    return -1;
+  }
+  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, rec->salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE,
        crypto_pwhash_ALG_DEFAULT) != 0) {
     /* out of memory */
+    sodium_munlock(rw0,sizeof rw0);
     sodium_munlock(rw,sizeof rw);
     return -1;
   }
+  sodium_munlock(rw0,sizeof rw0);
 
 #ifdef TRACE
   dump((uint8_t*) rw, 32, "key ");
@@ -209,6 +216,11 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
 
+#ifdef TRACE
+  dump(_pub, sizeof(Opaque_UserSession), "session srv pub ");
+  dump(_rec, sizeof(Opaque_UserRecord)+rec->extra_len, "session srv rec ");
+#endif
+
   // (a) Checks that α ∈ G^∗ . If not, outputs (abort, sid , ssid ) and halts;
   if(crypto_core_ristretto255_is_valid_point(pub->alpha)!=1) return -1;
 
@@ -219,6 +231,14 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
   uint8_t x_s[crypto_scalarmult_SCALARBYTES];
   if(-1==sodium_mlock(x_s,sizeof x_s)) return -1;
   randombytes(x_s, crypto_scalarmult_SCALARBYTES);
+#ifdef TRACE
+  dump(x_s, sizeof(x_s), "session srv x_s ");
+#endif
+
+#ifdef TRACE
+  dump(rec->k_s, sizeof(rec->k_s), "session srv k_s ");
+  dump(pub->alpha, sizeof(pub->alpha), "session srv alpha ");
+#endif
 
   // computes β := α^k_s
   if (crypto_scalarmult_ristretto255(resp->beta, rec->k_s, pub->alpha) != 0) {
@@ -228,6 +248,9 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
 
   // X_s := g^x_s;
   crypto_scalarmult_base(resp->X_s, x_s);
+#ifdef TRACE
+  dump(resp->X_s, sizeof(resp->X_s), "session srv X_s ");
+#endif
 
   // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f_K(0);
   // paper instantiates HMQV, we do only triple-dh
@@ -236,6 +259,10 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
     return -1;
   }
   sodium_munlock(x_s, sizeof(x_s));
+#ifdef TRACE
+  dump(sk, sizeof(sk), "session srv sk ");
+  dump(rec->salt, sizeof(rec->salt), "session srv salt ");
+#endif
 
   // (e) Sends β, X_s and c to U;
   memcpy(&resp->c, &rec->c, sizeof rec->c + rec->extra_len);
@@ -245,6 +272,10 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
   memcpy(&resp->extra_len, &rec->extra_len, sizeof rec->extra_len);
 
   sphinx_f(sk, sizeof sk, 1, resp->auth);
+
+#ifdef TRACE
+  dump(resp->auth, sizeof(resp->auth), "session srv auth ");
+#endif
 
   // (f) Outputs (sid , ssid , SK).
   // e&f handled as parameters
@@ -272,6 +303,12 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
                               uint8_t rwd[crypto_secretbox_KEYBYTES]) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
+#ifdef TRACE
+  dump(pw,pwlen, "session user finish pw ");
+  dump(key,key_len, "session user finish key ");
+  dump(_sec,OPAQUE_USER_SESSION_SECRET_LEN, "session user finish sec ");
+  dump(_resp,OPAQUE_SERVER_SESSION_LEN, "session user finish resp ");
+#endif
 
   // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
   if(crypto_core_ristretto255_is_valid_point(resp->beta)!=1) return -1;
@@ -284,6 +321,10 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
     sodium_munlock(ir,sizeof ir);
     return -1;
   }
+#ifdef TRACE
+  dump(sec->r,sizeof(sec->r), "session user finish r ");
+  dump(ir,sizeof(ir), "session user finish r^-1 ");
+#endif
 
   // h0 = β^(1/r)
   // beta^(1/r) = h(pwd)^k
@@ -292,23 +333,23 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
     sodium_munlock(ir,sizeof ir);
     return -1;
   }
+#ifdef TRACE
+  dump(resp->beta,sizeof(resp->beta), "session user finish beta ");
+#endif
   if (crypto_scalarmult_ristretto255(h0, ir, resp->beta) != 0) {
     sodium_munlock(ir,sizeof ir);
     sodium_munlock(h0,sizeof h0);
     return -1;
   }
   sodium_munlock(ir,sizeof ir);
-  uint8_t rw[crypto_secretbox_KEYBYTES];
-  if(-1==sodium_mlock(rw,sizeof rw)) {
-    sodium_munlock(h0,sizeof h0);
-    return -1;
-  }
+#ifdef TRACE
+  dump(h0,sizeof(h0), "session user finish h0 ");
+#endif
 
   // rw = H(pw, β^(1/r))
   crypto_generichash_state state;
   if(-1==sodium_mlock(&state,sizeof state)) {
     sodium_munlock(h0,sizeof h0);
-    sodium_munlock(rw,sizeof rw);
     return -1;
   }
   if(key != NULL) {
@@ -318,17 +359,37 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
   }
   crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
-  crypto_generichash_final(&state, rw, 32);
   sodium_munlock(h0, sizeof(h0));
+
+  uint8_t rw0[crypto_secretbox_KEYBYTES];
+  if(-1==sodium_mlock(rw0,sizeof rw0)) {
+    sodium_munlock(&state, sizeof(state));
+    return -1;
+  }
+  crypto_generichash_final(&state, rw0, sizeof(rw0));
   sodium_munlock(&state, sizeof(state));
 
-  if (crypto_pwhash(rw, sizeof rw, (const char*) rw, sizeof rw, resp->salt,
+#ifdef TRACE
+  dump(rw0,sizeof(rw0), "session user finish rw0 ");
+#endif
+
+  uint8_t rw[crypto_secretbox_KEYBYTES];
+  if(-1==sodium_mlock(rw,sizeof rw)) {
+    sodium_munlock(rw0, sizeof(rw0));
+    return -1;
+  }
+  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, resp->salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE,
        crypto_pwhash_ALG_DEFAULT) != 0) {
     /* out of memory */
+    sodium_munlock(rw0, sizeof rw0);
     sodium_munlock(rw, sizeof rw);
     return -1;
   }
+  sodium_munlock(rw0, sizeof rw0);
+#ifdef TRACE
+  dump(rw,sizeof(rw), "session user finish rw ");
+#endif
 
   // (c) Computes AuthDec_rw(c). If the result is ⊥, outputs (abort, sid , ssid ) and halts.
   //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
@@ -469,17 +530,11 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
     return -1;
   }
   sodium_munlock(ir, sizeof ir);
-  uint8_t rw[32];
-  if(-1==sodium_mlock(rw, sizeof rw)) {
-    sodium_munlock(h0, sizeof h0);
-    return -1;
-  }
 
   // rw = H(pw, β^(1/r))
   crypto_generichash_state state;
   if(-1==sodium_mlock(&state, sizeof state)) {
     sodium_munlock(h0, sizeof h0);
-    sodium_munlock(rw, sizeof rw);
     return -1;
   }
   if(key != NULL) {
@@ -489,24 +544,37 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
   }
   crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
-  crypto_generichash_final(&state, rw, 32);
   sodium_munlock(h0, sizeof(h0));
+
+  uint8_t rw0[32];
+  if(-1==sodium_mlock(rw0, sizeof rw0)) {
+    sodium_munlock(&state, sizeof state);
+    return -1;
+  }
+  crypto_generichash_final(&state, rw0, sizeof rw0);
   sodium_munlock(&state, sizeof(state));
 
 #ifdef TRACE
-  dump((uint8_t*) rw, 32, "rw ");
+  dump((uint8_t*) rw0, 32, "rw0 ");
 #endif
 
   // generate salt
   randombytes(rec->salt, sizeof(rec->salt));
 
-  if (crypto_pwhash(rw, sizeof rw, (const char*) rw, sizeof rw, rec->salt,
+  uint8_t rw[32];
+  if(-1==sodium_mlock(rw, sizeof rw)) {
+    sodium_munlock(rw0, sizeof rw0);
+    return -1;
+  }
+  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, rec->salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE,
        crypto_pwhash_ALG_DEFAULT) != 0) {
     /* out of memory */
+    sodium_munlock(rw0, sizeof(rw0));
     sodium_munlock(rw, sizeof(rw));
     return -1;
   }
+  sodium_munlock(rw0, sizeof(rw0));
 
 #ifdef TRACE
   dump((uint8_t*) rw, 32, "key ");
