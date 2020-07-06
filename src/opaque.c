@@ -42,7 +42,6 @@ typedef struct {
   uint8_t p_s[crypto_scalarmult_SCALARBYTES];
   uint8_t P_u[crypto_scalarmult_BYTES];
   uint8_t P_s[crypto_scalarmult_BYTES];
-  uint8_t salt[32];
   uint64_t extra_len;
   Opaque_Blob c;
 } __attribute((packed)) Opaque_UserRecord;
@@ -62,7 +61,6 @@ typedef struct {
   uint8_t beta[crypto_core_ristretto255_BYTES];
   uint8_t X_s[crypto_scalarmult_BYTES];
   uint8_t auth[crypto_generichash_BYTES];
-  uint8_t salt[32];
   uint64_t extra_len;
   Opaque_Blob c;
 } __attribute((packed)) Opaque_ServerSession;
@@ -100,14 +98,14 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
 #ifdef TRACE
   dump((uint8_t*) rw0, 32, "rw0 ");
 #endif
-
-  randombytes(rec->salt, sizeof(rec->salt));
+  // according to the ietf draft this could be all zeroes
   uint8_t rw[32];
   if(-1==sodium_mlock(rw,sizeof rw)) {
     sodium_munlock(rw0,sizeof rw0);
     return -1;
   }
-  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, rec->salt,
+  uint8_t salt[32]={0};
+  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE,
        crypto_pwhash_ALG_DEFAULT) != 0) {
     /* out of memory */
@@ -261,13 +259,10 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
   sodium_munlock(x_s, sizeof(x_s));
 #ifdef TRACE
   dump(sk, sizeof(sk), "session srv sk ");
-  dump(rec->salt, sizeof(rec->salt), "session srv salt ");
 #endif
 
   // (e) Sends β, X_s and c to U;
   memcpy(&resp->c, &rec->c, sizeof rec->c + rec->extra_len);
-  // also send salt
-  memcpy(&resp->salt, &rec->salt, sizeof rec->salt);
   // also send len of extra data
   memcpy(&resp->extra_len, &rec->extra_len, sizeof rec->extra_len);
 
@@ -378,7 +373,8 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
     sodium_munlock(rw0, sizeof(rw0));
     return -1;
   }
-  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, resp->salt,
+  uint8_t salt[32]={0};
+  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE,
        crypto_pwhash_ALG_DEFAULT) != 0) {
     /* out of memory */
@@ -487,7 +483,6 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t _sec[OPAQUE_RE
 // user computes:
 // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
 // (b) Computes rw := H(key, pw | β^1/r );
-// (c) generates salt
 // (c) p_u ←_R Z_q
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
@@ -558,15 +553,14 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
   dump((uint8_t*) rw0, 32, "rw0 ");
 #endif
 
-  // generate salt
-  randombytes(rec->salt, sizeof(rec->salt));
-
   uint8_t rw[32];
   if(-1==sodium_mlock(rw, sizeof rw)) {
     sodium_munlock(rw0, sizeof rw0);
     return -1;
   }
-  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, rec->salt,
+  // salt - according to the ietf draft this could be all zeroes
+  uint8_t salt[32]={0};
+  if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE,
        crypto_pwhash_ALG_DEFAULT) != 0) {
     /* out of memory */
