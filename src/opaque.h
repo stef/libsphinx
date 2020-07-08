@@ -5,11 +5,12 @@
 #include <stdlib.h>
 #include <sodium.h>
 
+#define OPAQUE_NONCE_BYTES 24
 #define OPAQUE_BLOB_LEN (crypto_hash_sha256_BYTES+crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES+crypto_scalarmult_BYTES+crypto_secretbox_MACBYTES)
 #define OPAQUE_USER_RECORD_LEN (crypto_core_ristretto255_SCALARBYTES+crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES+crypto_scalarmult_BYTES+32+sizeof(uint64_t)+OPAQUE_BLOB_LEN)
-#define OPAQUE_USER_SESSION_PUBLIC_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES)
-#define OPAQUE_USER_SESSION_SECRET_LEN (crypto_core_ristretto255_SCALARBYTES+crypto_scalarmult_SCALARBYTES)
-#define OPAQUE_SERVER_SESSION_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES+crypto_generichash_BYTES+32+sizeof(uint64_t)+OPAQUE_BLOB_LEN)
+#define OPAQUE_USER_SESSION_PUBLIC_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES+OPAQUE_NONCE_BYTES)
+#define OPAQUE_USER_SESSION_SECRET_LEN (crypto_core_ristretto255_SCALARBYTES+crypto_scalarmult_SCALARBYTES+OPAQUE_NONCE_BYTES)
+#define OPAQUE_SERVER_SESSION_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES+crypto_generichash_BYTES+OPAQUE_NONCE_BYTES+32+sizeof(uint64_t)+OPAQUE_BLOB_LEN)
 #define OPAQUE_REGISTER_PUBLIC_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES)
 #define OPAQUE_REGISTER_SECRET_LEN (crypto_scalarmult_SCALARBYTES+crypto_core_ristretto255_SCALARBYTES)
 #define OPAQUE_MAX_EXTRA_BYTES 1024*1024 // 1 MB should be enough for even most PQ params

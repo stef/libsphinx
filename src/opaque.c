@@ -51,16 +51,19 @@ typedef struct {
 typedef struct {
   uint8_t alpha[crypto_core_ristretto255_BYTES];
   uint8_t X_u[crypto_scalarmult_BYTES];
+  uint8_t nonceU[OPAQUE_NONCE_BYTES];
 } __attribute((packed)) Opaque_UserSession;
 
 typedef struct {
   uint8_t r[crypto_core_ristretto255_SCALARBYTES];
   uint8_t x_u[crypto_scalarmult_SCALARBYTES];
+  uint8_t nonceU[OPAQUE_NONCE_BYTES];
 } __attribute((packed)) Opaque_UserSession_Secret;
 
 typedef struct {
   uint8_t beta[crypto_core_ristretto255_BYTES];
   uint8_t X_s[crypto_scalarmult_BYTES];
+  uint8_t nonceS[OPAQUE_NONCE_BYTES];
   uint8_t auth[crypto_generichash_BYTES];
   uint64_t extra_len;
   Opaque_Blob c;
@@ -197,6 +200,10 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec
   // x_u ←_R Z_q
   randombytes(sec->x_u, crypto_scalarmult_SCALARBYTES);
 
+  // nonceU
+  randombytes(sec->nonceU, OPAQUE_NONCE_BYTES);
+  memcpy(pub->nonceU, sec->nonceU, OPAQUE_NONCE_BYTES);
+
   // X_u := g^x_u
   crypto_scalarmult_base(pub->X_u, sec->x_u);
 #ifdef TRACE
@@ -253,6 +260,9 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
 #ifdef TRACE
   dump(resp->X_s, sizeof(resp->X_s), "session srv X_s ");
 #endif
+
+  // nonceS
+  randombytes(resp->nonceS, OPAQUE_NONCE_BYTES);
 
   // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f_K(0);
   // paper instantiates HMQV, we do only triple-dh
