@@ -116,5 +116,7 @@ int main(void) {
   _dump(su, 32, "f_sk(2): ");
   assert(0==sodium_memcmp(su,us,32));
 
+  printf("all ok\n");
+
   return 0;
 }
