@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <sodium.h>
 
-#define OPAQUE_BLOB_LEN (crypto_secretbox_NONCEBYTES+crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES+crypto_scalarmult_BYTES+crypto_secretbox_MACBYTES)
+#define OPAQUE_BLOB_LEN (crypto_hash_sha256_BYTES+crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES+crypto_scalarmult_BYTES+crypto_secretbox_MACBYTES)
 #define OPAQUE_USER_RECORD_LEN (crypto_core_ristretto255_SCALARBYTES+crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES+crypto_scalarmult_BYTES+32+sizeof(uint64_t)+OPAQUE_BLOB_LEN)
 #define OPAQUE_USER_SESSION_PUBLIC_LEN (crypto_core_ristretto255_BYTES+crypto_scalarmult_BYTES)
 #define OPAQUE_USER_SESSION_SECRET_LEN (crypto_core_ristretto255_SCALARBYTES+crypto_scalarmult_SCALARBYTES)

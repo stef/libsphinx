@@ -26,14 +26,15 @@
 */
 
 #include "opaque.h"
+#include "opaque_envelope.h"
 #include "common.h"
 
 typedef struct {
-  uint8_t nonce[crypto_secretbox_NONCEBYTES];
+  uint8_t nonce[crypto_hash_sha256_BYTES];
   uint8_t p_u[crypto_scalarmult_SCALARBYTES];
   uint8_t P_u[crypto_scalarmult_BYTES];
   uint8_t P_s[crypto_scalarmult_BYTES];
-  uint8_t extra_or_mac[crypto_secretbox_MACBYTES];
+  uint8_t extra_or_mac[crypto_hash_sha256_BYTES];
 } __attribute((packed)) Opaque_Blob;
 
 // user specific record stored at server upon registration
@@ -98,12 +99,12 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
 #ifdef TRACE
   dump((uint8_t*) rw0, 32, "rw0 ");
 #endif
-  // according to the ietf draft this could be all zeroes
   uint8_t rw[32];
   if(-1==sodium_mlock(rw,sizeof rw)) {
     sodium_munlock(rw0,sizeof rw0);
     return -1;
   }
+  // according to the ietf draft this could be all zeroes
   uint8_t salt[32]={0};
   if (crypto_pwhash(rw, sizeof rw, (const char*) rw0, sizeof rw0, salt,
        crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE,
@@ -158,17 +159,20 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
   dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
 #endif
   // c ← AuthEnc_rw(p_u,P_u,P_s);
-  randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                                  // nonce for crypto_secretbox
-
 #ifdef TRACE
   dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
 #endif
 
-  crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // ciphertext
-                        ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // plaintext
-                        crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+extra_len, // plaintext len
-                        ((uint8_t*)&rec->c),                                               // nonce
-                        rw);                                                               // key
+  if(0!=opaque_envelope(rw,
+                        // SecEnv, SecEnv_len
+                        ((uint8_t*)&rec->c)+crypto_hash_sha256_BYTES, crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+extra_len,
+                        // ClrEnv, ClrEnv_len
+                        0,0,  // todo expose? ClrEnv
+                        // envelope
+                        ((uint8_t*)&rec->c),
+                        0)) { // todo: export_key not exposed)
+    return -1;
+  }
 
   sodium_munlock(rw, sizeof(rw));
 
@@ -398,20 +402,25 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
     sodium_munlock(rw, sizeof rw);
     return -1;
   }
-  Opaque_Blob *c = (Opaque_Blob *) buf;
-  if(0!=crypto_secretbox_open_easy(buf+crypto_secretbox_NONCEBYTES,                     // plaintext
-                                   ((uint8_t*)&resp->c)+crypto_secretbox_NONCEBYTES,    // ciphertext
-                                                                                        // plaintext len
-                                   crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+crypto_secretbox_MACBYTES+resp->extra_len,
-                                   ((uint8_t*)&resp->c),                                // nonce
-                                   rw)) {                                               // key
+  if(0!=opaque_envelope_open(rw,
+                             // envelope
+                             ((uint8_t*)&resp->c),
+                             // SecEnv, SecEnv_len
+                             buf+crypto_hash_sha256_BYTES, crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+resp->extra_len,
+                             // ClrEnv, ClrEnv_len, todo expose? through API
+                             0, 0,
+                             // export key, todo expose through API
+                             0)) {
     sodium_munlock(rw, sizeof(rw));
     sodium_munlock(buf,sizeof buf);
     return -1;
   }
+
   if(rwd!=NULL)
     crypto_generichash(rwd, crypto_secretbox_KEYBYTES, rw, crypto_secretbox_KEYBYTES, (const uint8_t*) "rwd", 3);
   sodium_munlock(rw, sizeof(rw));
+
+  Opaque_Blob *c = (Opaque_Blob *) buf;
 
   // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
   if(0!=sphinx_user_3dh(sk, c->p_u, sec->x_u, c->P_s, resp->X_s)) {
@@ -593,17 +602,21 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
      memcpy(rec->c.extra_or_mac, extra, extra_len);
 
   // c ← AuthEnc_rw(p_u,P_u,P_s);
-  randombytes(rec->c.nonce, crypto_secretbox_NONCEBYTES);                                  // nonce for crypto_secretbox
-
 #ifdef TRACE
   dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "plain user rec ");
 #endif
 
-  crypto_secretbox_easy(((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // ciphertext
-                        ((uint8_t*)&rec->c)+crypto_secretbox_NONCEBYTES,                   // plaintext
-                        crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+extra_len, // plaintext len
-                        ((uint8_t*)&rec->c),                                               // nonce
-                        rw);                                                               // key
+  if(0!=opaque_envelope(rw,
+                        // SecEnv, SecEnv_len
+                        ((uint8_t*)&rec->c)+crypto_hash_sha256_BYTES, crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+extra_len,
+                        // ClrEnv, ClrEnv_len
+                        0,0,  // todo expose? ClrEnv
+                        // envelope
+                        ((uint8_t*)&rec->c),
+                        0)) { // todo: export_key not exposed)
+    return -1;
+  }
+
 #ifdef TRACE
   dump(_rec, sizeof(Opaque_UserRecord)+extra_len, "cipher user rec ");
 #endif

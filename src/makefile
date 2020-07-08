@@ -6,6 +6,14 @@ LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
 
+SODIUM_NEWER_THAN_1_0_18 := $(shell pkgconf --atleast-version=1.0.19 libsodium; echo $$?)
+ifeq ($(SODIUM_NEWER_THAN_1_0_18),1)
+	CFLAGS+= -Iaux
+	EXTRA_OBJECTS+= aux/kdf_hkdf_sha256.o
+else
+	CFLAGS+= -DHAVE_SODIUM_HKDF=1
+endif
+
 all: bin libsphinx.so tests
 bin: bin/challenge bin/respond bin/derive bin/2pass
 
@@ -23,7 +31,7 @@ android: LIBS=-Wl,-Bstatic -Wl,-Bdynamic -lsodiumjni -L.
 android: EXTRA_OBJECTS=jni.o
 android: jni.o libsphinx.so
 
-tests$(EXT): tests/pake$(EXT) tests/sphinx$(EXT) tests/opaque$(EXT)
+tests$(EXT): tests/pake$(EXT) tests/sphinx$(EXT) tests/opaque$(EXT) tests/opaque_env$(EXT)
 
 bin/challenge$(EXT): bin/challenge.c
 	$(CC) $(CFLAGS) -o bin/challenge$(EXT) bin/challenge.c $(LDFLAGS)
@@ -37,8 +45,8 @@ bin/derive$(EXT): bin/derive.c
 bin/2pass$(EXT): bin/2pass.c
 	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS)
 
-libsphinx.$(SOEXT): sphinx.o pake.o opaque.o common.o $(EXTRA_OBJECTS)
-	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) common.o sphinx.o pake.o opaque.o $(EXTRA_OBJECTS) $(LDFLAGS)
+libsphinx.$(SOEXT): common.o sphinx.o pake.o opaque.o opaque_envelope.o $(EXTRA_OBJECTS)
+	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $^ $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -L. -lsphinx $(LDFLAGS)
@@ -48,6 +56,9 @@ tests/pake$(EXT): tests/pake-test.c libsphinx.$(SOEXT)
 
 tests/opaque$(EXT): tests/opaque-test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/opaque$(EXT) tests/opaque-test.c -L. -lsphinx $(LDFLAGS)
+
+tests/opaque_env$(EXT): tests/opaque_env.c libsphinx.$(SOEXT)
+	$(CC) $(CFLAGS) -o tests/opaque_env$(EXT) tests/opaque_env.c -L. -lsphinx $(LDFLAGS)
 
 win/libsodium-win64:
 	@echo 'win/libsodium-win64 not found.'
