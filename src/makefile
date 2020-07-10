@@ -45,7 +45,7 @@ bin/derive$(EXT): bin/derive.c
 bin/2pass$(EXT): bin/2pass.c
 	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS)
 
-libsphinx.$(SOEXT): common.o sphinx.o pake.o opaque.o opaque_envelope.o $(EXTRA_OBJECTS)
+libsphinx.$(SOEXT): common.o sphinx.o pake.o opaque.o $(EXTRA_OBJECTS)
 	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $^ $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
@@ -56,9 +56,6 @@ tests/pake$(EXT): tests/pake-test.c libsphinx.$(SOEXT)
 
 tests/opaque$(EXT): tests/opaque-test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/opaque$(EXT) tests/opaque-test.c -L. -lsphinx $(LDFLAGS)
-
-tests/opaque_env$(EXT): tests/opaque_env.c libsphinx.$(SOEXT)
-	$(CC) $(CFLAGS) -o tests/opaque_env$(EXT) tests/opaque_env.c -L. -lsphinx $(LDFLAGS)
 
 win/libsodium-win64:
 	@echo 'win/libsodium-win64 not found.'
