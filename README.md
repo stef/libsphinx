@@ -9,7 +9,6 @@ Real World Crypto https://www.youtube.com/watch?v=px8hiyf81iM
 
 it also implements:
 
-  - the PKI-free PAKE protocol as specified on page 18 of the same publication
   - The OPAQUE protocol as specified on page 28 of: https://eprint.iacr.org/2018/163 - see also OPAQUE.md
 
 ## What is this thing?
@@ -57,8 +56,7 @@ make
 
 libsphinx builds a library, which you can use to build your
 own password manager either in C/C++ or any other language that can
-bind to this library. The library also contains an experimental
-version of the PKI-free PAKE protocol from page 18 of the paper.
+bind to this library.
 
 ### The Sphinx API
 The Library exposes the following 3 functions for the FK-PTR protocol
@@ -99,66 +97,6 @@ int sphinx_finish(const uint8_t *pwd, const size_t p_len,
  * rwd: is an output param, the derived (binary) password, it is a
    `SPHINX_255_SER_BYTES` (32) byte array
  * this function returns 1 on error, 0 on success
-
-### The PKI-free PAKE API
-
-The following functions implement the PKI-free PAKE protocol, (for the
-explanation of the various parameters please see the original paper
-and the `src/tests/pake-test.c` example file):
-
-```
-void pake_server_init(uint8_t *p_s, uint8_t *P_s);
-```
-
-This function is called when setting up a new server. It creates a
-long-term identity keypair. The public key needs to be shared with all
-clients, the secret key needs to be well protected and persisted for
-later usage.
-
-```
-void pake_client_init(const uint8_t *rwd, const size_t rwd_len,
-                      const uint8_t *P_s,
-                      uint8_t k_s[32], uint8_t c[32],
-                      uint8_t C[32], uint8_t P_u[32], uint8_t m_u[32]);
-```
-
-This function needs to be run on the client when registering at a
-server. The output parameters need to be sent to the server.
-
-
-```
-void pake_start_pake(const uint8_t *rwd, const size_t rwd_len,
-                     uint8_t alpha[32], uint8_t x_u[32],
-                     uint8_t X_u[32], uint8_t sp[32]);
-```
-
-The client initiates a "login" to the server with this function.
-
-```
-int pake_server_pake(const uint8_t alpha[32], const uint8_t X_u[32],  // input params
-                     const uint8_t k_s[32], const uint8_t P_u[32],
-                     const uint8_t p_s[32],
-                     uint8_t beta[32], uint8_t X_s[32],               // output params
-                     uint8_t SK[DECAF_X25519_PUBLIC_BYTES]);
-```
-
-This function implements the "login" on the server, it reuses the data
-received when registering the user, and some other parameters that
-came out of start_pake() when the client initiated the "login". At
-successful completion SK should be a shared secret with the client. On
-error the function return 1, otherwise 0.
-
-```
-int pake_user_pake(const uint8_t *rwd, const size_t rwd_len, const uint8_t sp[32],
-                   const uint8_t x_u[32], const uint8_t beta[32], const uint8_t c[32],
-                   const uint8_t C[32], const uint8_t P_u[32], const uint8_t m_u[32],
-                   const uint8_t P_s[32], const uint8_t X_s[32],
-                   uint8_t SK[DECAF_X25519_PUBLIC_BYTES]);
-```
-
-This function finalizes the "login" on the client side. At successful
-completion SK should be a shared secret with the server. On error the
-function return 1, otherwise 0.
 
 ### OPAQUE API
 
@@ -291,9 +229,7 @@ and make sure `auth==auth2`.
 
 libsphinx comes with very simple binaries implementing the sphinx
 protocol, so you can build your own password storage even from shell
-scripts. There are no such binaries provided for the PKI-free PAKE nor
-the OPAQUE protocols. Each step in the SPHINX protocol is handled by
-one binary:
+scripts.  Each step in the SPHINX protocol is handled by one binary:
 
 ### step 1 - challenge
 The following creates a challenge for a device:

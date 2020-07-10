@@ -31,7 +31,7 @@ android: LIBS=-Wl,-Bstatic -Wl,-Bdynamic -lsodiumjni -L.
 android: EXTRA_OBJECTS=jni.o
 android: jni.o libsphinx.so
 
-tests$(EXT): tests/pake$(EXT) tests/sphinx$(EXT) tests/opaque$(EXT) tests/opaque_env$(EXT)
+tests$(EXT): tests/sphinx$(EXT) tests/opaque$(EXT) tests/opaque_env$(EXT)
 
 bin/challenge$(EXT): bin/challenge.c
 	$(CC) $(CFLAGS) -o bin/challenge$(EXT) bin/challenge.c $(LDFLAGS)
@@ -45,14 +45,11 @@ bin/derive$(EXT): bin/derive.c
 bin/2pass$(EXT): bin/2pass.c
 	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS)
 
-libsphinx.$(SOEXT): common.o sphinx.o pake.o opaque.o $(EXTRA_OBJECTS)
+libsphinx.$(SOEXT): common.o sphinx.o opaque.o $(EXTRA_OBJECTS)
 	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $^ $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -L. -lsphinx $(LDFLAGS)
-
-tests/pake$(EXT): tests/pake-test.c libsphinx.$(SOEXT)
-	$(CC) $(CFLAGS) -o tests/pake$(EXT) tests/pake-test.c -L. -lsphinx $(LDFLAGS)
 
 tests/opaque$(EXT): tests/opaque-test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/opaque$(EXT) tests/opaque-test.c -L. -lsphinx $(LDFLAGS)
@@ -79,7 +76,7 @@ $(PREFIX)/include/opaque.h: opaque.h
 
 clean:
 	rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so
-	rm -f tests/sphinx tests/pake tests/opaque tests/sphinx.exe tests/pake.exe tests/opaque.exe *.o
+	rm -f tests/sphinx tests/opaque tests/sphinx.exe tests/opaque.exe *.o
 	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
 .PHONY: bin clean install
