@@ -29,7 +29,6 @@ static void _dump(const uint8_t *p, const size_t len, const char* msg) {
   printf("\n");
 }
 
-
 int main(void) {
   uint8_t pw[]="simple guessable dictionary password";
   size_t pwlen=strlen((char*) pw);
@@ -38,6 +37,7 @@ int main(void) {
   uint8_t key[]="some optional key contributed to the opaque protocol";
   size_t key_len=strlen((char*) key);
   unsigned char rec[OPAQUE_USER_RECORD_LEN+extra_len];
+  Opaque_Ids ids={4,(uint8_t*)"user",6,(uint8_t*)"server"};
 
   // register user
   printf("storePwdFile\n");
@@ -50,8 +50,10 @@ int main(void) {
 
   unsigned char resp[OPAQUE_SERVER_SESSION_LEN+extra_len];
   uint8_t sk[32];
+  uint8_t km3[crypto_auth_hmacsha256_KEYBYTES];
+  crypto_hash_sha256_state state;
   printf("srvSession\n");
-  if(0!=opaque_session_srv(pub, rec, resp, sk)) return 1;
+  if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, km3, &state)) return 1;
 
   _dump(sk,32,"sk_s: ");
 
@@ -59,11 +61,18 @@ int main(void) {
   printf("usrSessionEnd\n");
   uint8_t extra_recovered[extra_len+1], rwd[crypto_secretbox_KEYBYTES];
   extra_recovered[extra_len]=0;
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, pk, extra_recovered, rwd)) return 1;
+  uint8_t authU[crypto_auth_hmacsha256_BYTES];
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &ids, 0, pk, extra_recovered, rwd, authU)) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);
   _dump(rwd,32,"rwd: ");
   _dump(pk,32,"sk_u: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
+
+  printf("session server auth\n");
+  if(-1==opaque_session_server_auth(km3, &state, authU, NULL)) {
+    printf("failed authenticating user\n");
+    return 1;
+  }
 
   // variant where user registration does not leak secrets to server
   uint8_t alpha[crypto_core_ristretto255_BYTES];
@@ -86,10 +95,10 @@ int main(void) {
   printf("userSession\n");
   opaque_session_usr_start(pw, pwlen, sec, pub);
   printf("srvSession\n");
-  if(0!=opaque_session_srv(pub, rrec, resp, sk)) return 1;
+  if(0!=opaque_session_srv(pub, rrec, &ids, NULL, resp, sk, km3, &state)) return 1;
   _dump(sk,32,"sk_s: ");
   printf("userSessionEnd\n");
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, pk, extra_recovered, rwd)) return 1;
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &ids, NULL, pk, extra_recovered, rwd, authU)) return 1;
   _dump(pk,32,"sk_u: ");
   _dump(rwd,32,"rwd: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
@@ -97,24 +106,10 @@ int main(void) {
 
   // authenticate both parties:
 
-  // to authenticate the server to the user, the server sends f_sk(1)
-  // to the user, which calculates f_pk(1) and verifies it's the same
-  // value as sent by the server.
-  uint8_t su[32], us[32];
-  sphinx_f(sk, sizeof sk, '1', su);
-  sphinx_f(pk, sizeof pk, '1', us);
-  _dump(su, 32, "f_sk(1): ");
-  _dump(us, 32, "f_pk(1): ");
-  assert(0==sodium_memcmp(su,us,32));
-
-  // to authenticate the user to the server, the user sends f_pk(2)
-  // to the server, which calculates f_sk(2) and verifies it's the same
-  // value as sent by the user.
-  sphinx_f(pk, sizeof pk, '2', us);
-  sphinx_f(sk, sizeof sk, '2', su);
-  _dump(us, 32, "f_pk(2): ");
-  _dump(su, 32, "f_sk(2): ");
-  assert(0==sodium_memcmp(su,us,32));
+  if(-1==opaque_session_server_auth(km3, &state, authU, NULL)) {
+    printf("failed authenticating user\n");
+    return 1;
+  }
 
   printf("all ok\n");
 

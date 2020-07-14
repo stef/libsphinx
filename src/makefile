@@ -1,7 +1,7 @@
 PREFIX?=/usr/local
 INC=-I/usr/include/sodium
 LIBS=-lsodium
-CFLAGS=$(INC) -Wall -fPIC -fPIE -O3 -g #-DTRACE
+CFLAGS=$(INC) -march=native -Wall -fPIC -fPIE -O2 -g #-DTRACE
 LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
@@ -31,7 +31,7 @@ android: LIBS=-Wl,-Bstatic -Wl,-Bdynamic -lsodiumjni -L.
 android: EXTRA_OBJECTS=jni.o
 android: jni.o libsphinx.so
 
-tests$(EXT): tests/sphinx$(EXT) tests/opaque$(EXT) tests/opaque_env$(EXT)
+tests$(EXT): tests/sphinx$(EXT) tests/opaque$(EXT)
 
 bin/challenge$(EXT): bin/challenge.c
 	$(CC) $(CFLAGS) -o bin/challenge$(EXT) bin/challenge.c $(LDFLAGS)
