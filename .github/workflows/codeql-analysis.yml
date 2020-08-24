@@ -49,7 +49,7 @@ jobs:
     - run: |
        cd src
        sudo apt-get update
-       sudo apt-get install python libsodium-dev
+       sudo apt-get install python libsodium-dev pkgconf
        make bootstrap
      
     - name: Perform CodeQL Analysis
