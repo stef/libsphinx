@@ -50,7 +50,7 @@ jobs:
        cd src
        sudo apt-get update
        sudo apt-get install python libsodium-dev pkgconf
-       make bootstrap
+       make
      
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
