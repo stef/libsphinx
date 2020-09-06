@@ -36,12 +36,16 @@ int main(void) {
   size_t extra_len=strlen((char*) extra);
   uint8_t key[]="some optional key contributed to the opaque protocol";
   size_t key_len=strlen((char*) key);
+  uint8_t ClrEnv[]="ClrEnv";
+  size_t ClrEnv_len=sizeof(ClrEnv);
+  uint8_t export_key[crypto_hash_sha256_BYTES];
+  uint8_t export_key_x[crypto_hash_sha256_BYTES];
   unsigned char rec[OPAQUE_USER_RECORD_LEN+extra_len];
   Opaque_Ids ids={4,(uint8_t*)"user",6,(uint8_t*)"server"};
 
   // register user
   printf("storePwdFile\n");
-  if(0!=opaque_init_srv(pw, pwlen, extra, extra_len, key, key_len, rec)) return 1;
+  if(0!=opaque_init_srv(pw, pwlen, extra, extra_len, key, key_len, ClrEnv, ClrEnv_len, rec, export_key)) return 1;
 
   // initiate login
   unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
@@ -62,11 +66,12 @@ int main(void) {
   uint8_t extra_recovered[extra_len+1], rwd[crypto_secretbox_KEYBYTES];
   extra_recovered[extra_len]=0;
   uint8_t authU[crypto_auth_hmacsha256_BYTES];
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &ids, 0, pk, extra_recovered, rwd, authU)) return 1;
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &ids, 0, pk, extra_recovered, rwd, authU, export_key_x)) return 1;
   printf("recovered extra data: \"%s\"\n", extra_recovered);
   _dump(rwd,32,"rwd: ");
   _dump(pk,32,"sk_u: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
+  assert(sodium_memcmp(export_key,export_key_x,sizeof export_key)==0);
 
   printf("session server auth\n");
   if(-1==opaque_session_server_auth(km3, &state, authU, NULL)) {

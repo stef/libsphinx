@@ -329,7 +329,9 @@ static int opaque_envelope_open(const uint8_t *rwd, const uint8_t *envelope,
 int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
                     const uint8_t *extra, const uint64_t extra_len,
                     const uint8_t *key, const uint64_t key_len,
-                    uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
+                    const uint8_t *ClrEnv, const uint64_t ClrEnv_len,
+                    uint8_t _rec[OPAQUE_USER_RECORD_LEN],
+                    uint8_t export_key[crypto_hash_sha256_BYTES]) {
   Opaque_UserRecord *rec = (Opaque_UserRecord *)_rec;
 
   // k_s ←_R Z_q
@@ -414,10 +416,10 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
                         // SecEnv, SecEnv_len
                         ((uint8_t*)&rec->c)+crypto_hash_sha256_BYTES, crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+extra_len,
                         // ClrEnv, ClrEnv_len
-                        0,0,  // todo expose? ClrEnv
+                        ClrEnv, ClrEnv_len,
                         // envelope
                         ((uint8_t*)&rec->c),
-                        0)) { // todo: export_key not exposed)
+                        export_key)) {
     return -1;
   }
 
@@ -576,7 +578,9 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
                               uint8_t *sk,
                               uint8_t *extra,
                               uint8_t rwd[crypto_secretbox_KEYBYTES],
-                              uint8_t auth[crypto_auth_hmacsha256_BYTES]) {
+                              uint8_t auth[crypto_auth_hmacsha256_BYTES],
+                              uint8_t *ClrEnv, size_t ClrEnv_len,
+                              uint8_t export_key[crypto_hash_sha256_BYTES]) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
 #ifdef TRACE
@@ -684,10 +688,9 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
                              ((uint8_t*)&resp->c),
                              // SecEnv, SecEnv_len
                              buf+crypto_hash_sha256_BYTES, crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+resp->extra_len,
-                             // ClrEnv, ClrEnv_len, todo expose? through API
-                             0, 0,
-                             // export key, todo expose through API
-                             0)) {
+                             // ClrEnv, ClrEnv_len
+                             ClrEnv, ClrEnv_len,
+                             export_key)) {
     sodium_munlock(rw, sizeof(rw));
     sodium_munlock(buf,sizeof buf);
     return -1;
@@ -829,8 +832,10 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
                                     const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN],
                                     const uint8_t *extra, const uint64_t extra_len,    // extra data to be encryped in the blob
                                     const uint8_t *key, const uint64_t key_len,        // contributes to the final rwd calculation as a key to the hash
+                                    const uint8_t *ClrEnv, const uint64_t ClrEnv_len,
                                     uint8_t _rec[OPAQUE_USER_RECORD_LEN],
-                                    uint8_t rwd[crypto_secretbox_KEYBYTES]) {
+                                    uint8_t rwd[crypto_secretbox_KEYBYTES],
+                                    uint8_t export_key[crypto_hash_sha256_BYTES]) {
 
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
@@ -938,11 +943,10 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
   if(0!=opaque_envelope(rw,
                         // SecEnv, SecEnv_len
                         ((uint8_t*)&rec->c)+crypto_hash_sha256_BYTES, crypto_scalarmult_SCALARBYTES+crypto_scalarmult_BYTES*2+extra_len,
-                        // ClrEnv, ClrEnv_len
-                        0,0,  // todo expose? ClrEnv
+                        ClrEnv,ClrEnv_len,
                         // envelope
                         ((uint8_t*)&rec->c),
-                        0)) { // todo: export_key not exposed)
+                        export_key)) {
     return -1;
   }
 
