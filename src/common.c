@@ -12,7 +12,8 @@ void dump(const uint8_t *p, const size_t len, const char* msg) {
 
 #ifdef NORANDOM
 void a_randombytes(void* const buf, const size_t len) {
-  memset(buf,0xa,len);
+  size_t i;
+  for(i=0;i<len;i++) ((uint8_t*)buf)[i]=i&0xff;
 }
 
 void a_randomscalar(unsigned char* buf) {
@@ -82,7 +83,7 @@ int sphinx_blindPW(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *a
   sodium_mlock(h0,sizeof h0);
   crypto_generichash(h0, sizeof h0, pw, pwlen, 0, 0);
 #ifdef TRACE
-  dump(h0, 32, "h0");
+  dump(h0, sizeof h0, "h0");
 #endif
   unsigned char H0[crypto_core_ristretto255_BYTES];
   sodium_mlock(H0,sizeof H0);
