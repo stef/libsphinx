@@ -22,7 +22,7 @@
 #include "../common.h"
 
 static void _dump(const uint8_t *p, const size_t len, const char* msg) {
-  int i;
+  size_t i;
   printf("%s",msg);
   for(i=0;i<len;i++)
     printf("%02x", p[i]);
@@ -32,82 +32,82 @@ static void _dump(const uint8_t *p, const size_t len, const char* msg) {
 int main(void) {
   uint8_t pw[]="simple guessable dictionary password";
   size_t pwlen=strlen((char*) pw);
-  uint8_t extra[]="some additional secret data stored in the blob";
-  size_t extra_len=strlen((char*) extra);
   uint8_t key[]="some optional key contributed to the opaque protocol";
   size_t key_len=strlen((char*) key);
   uint8_t ClrEnv[]="ClrEnv";
   size_t ClrEnv_len=sizeof(ClrEnv);
   uint8_t export_key[crypto_hash_sha256_BYTES];
   uint8_t export_key_x[crypto_hash_sha256_BYTES];
-  unsigned char rec[OPAQUE_USER_RECORD_LEN+extra_len];
+  unsigned char rec[OPAQUE_USER_RECORD_LEN+sizeof(ClrEnv)];
   Opaque_Ids ids={4,(uint8_t*)"user",6,(uint8_t*)"server"};
 
+  printf("sizeof(rec): %ld\n",sizeof(rec));
+
   // register user
-  printf("storePwdFile\n");
-  if(0!=opaque_init_srv(pw, pwlen, extra, extra_len, key, key_len, ClrEnv, ClrEnv_len, rec, export_key)) return 1;
+  printf("opaque_init_srv()\n");
+  if(0!=opaque_init_srv(pw, pwlen, key, key_len, ClrEnv, ClrEnv_len, rec, export_key)) return 1;
 
   // initiate login
   unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
-  printf("usrSession\n");
+  printf("opaque_session_usr_start()\n");
   opaque_session_usr_start(pw, pwlen, sec, pub);
 
-  unsigned char resp[OPAQUE_SERVER_SESSION_LEN+extra_len];
+  unsigned char resp[OPAQUE_SERVER_SESSION_LEN+sizeof(ClrEnv)];
   uint8_t sk[32];
   uint8_t km3[crypto_auth_hmacsha256_KEYBYTES];
   crypto_hash_sha256_state state;
-  printf("srvSession\n");
+  printf("opaque_session_srv()\n");
   if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, km3, &state)) return 1;
 
   _dump(sk,32,"sk_s: ");
 
   uint8_t pk[32];
-  printf("usrSessionEnd\n");
-  uint8_t extra_recovered[extra_len+1], rwd[crypto_secretbox_KEYBYTES];
-  extra_recovered[extra_len]=0;
+  printf("opaque_session_usr_finish()\n");
+  uint8_t rwd[crypto_secretbox_KEYBYTES];
   uint8_t authU[crypto_auth_hmacsha256_BYTES];
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &ids, 0, pk, extra_recovered, rwd, authU, export_key_x)) return 1;
-  printf("recovered extra data: \"%s\"\n", extra_recovered);
+  //Opaque_App_Infos infos;
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &ids, NULL, pk, rwd, authU, export_key_x)) return 1;
   _dump(rwd,32,"rwd: ");
   _dump(pk,32,"sk_u: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
   assert(sodium_memcmp(export_key,export_key_x,sizeof export_key)==0);
 
-  printf("session server auth\n");
+  printf("opaque_session_server_auth()\n");
   if(-1==opaque_session_server_auth(km3, &state, authU, NULL)) {
     printf("failed authenticating user\n");
     return 1;
   }
 
+  printf("\nprivate registration\n\n");
+
   // variant where user registration does not leak secrets to server
   uint8_t alpha[crypto_core_ristretto255_BYTES];
   uint8_t r[crypto_core_ristretto255_SCALARBYTES];
   // user initiates:
-  printf("newUser\n");
+  printf("opaque_private_init_usr_start\n");
   if(0!=opaque_private_init_usr_start(pw, pwlen, r, alpha)) return 1;
   // server responds
   unsigned char rsec[OPAQUE_REGISTER_SECRET_LEN], rpub[OPAQUE_REGISTER_PUBLIC_LEN];
-  printf("initUser\n");
+  printf("opaque_private_init_srv_respond\n");
   if(0!=opaque_private_init_srv_respond(alpha, rsec, rpub)) return 1;
   // user commits its secrets
-  unsigned char rrec[OPAQUE_USER_RECORD_LEN+extra_len];
-  printf("registerUser\n");
-  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, extra, extra_len, key, key_len, rrec, rwd)) return 1;
+  unsigned char rrec[OPAQUE_USER_RECORD_LEN+sizeof(ClrEnv)];
+  printf("opaque_private_init_usr_respond\n");
+  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, key, key_len, ClrEnv, ClrEnv_len, rrec, rwd, export_key)) return 1;
   // server "saves"
-  printf("saveUser\n");
+  printf("opaque_private_init_srv_finish\n");
   opaque_private_init_srv_finish(rsec, rpub, rrec);
 
-  printf("userSession\n");
+  printf("opaque_session_usr_start\n");
   opaque_session_usr_start(pw, pwlen, sec, pub);
-  printf("srvSession\n");
+  printf("opaque_session_srv\n");
   if(0!=opaque_session_srv(pub, rrec, &ids, NULL, resp, sk, km3, &state)) return 1;
   _dump(sk,32,"sk_s: ");
-  printf("userSessionEnd\n");
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &ids, NULL, pk, extra_recovered, rwd, authU)) return 1;
+  printf("opaque_session_usr_finish\n");
+  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &ids, NULL, pk, rwd, authU, export_key)) return 1;
   _dump(pk,32,"sk_u: ");
   _dump(rwd,32,"rwd: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
-  printf("recovered extra data: \"%s\"\n", extra_recovered);
 
   // authenticate both parties:
 
@@ -120,3 +120,4 @@ int main(void) {
 
   return 0;
 }
+
