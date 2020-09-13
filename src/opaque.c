@@ -21,6 +21,10 @@
        1/ instead of HMQV it implements a Triple-DH instead
        2/ it implements "user iterated hashing" from page 29 of the paper
        3/ implements a variant where U secrets never hit S unprotected
+
+    TODO:
+          - one master p_s/P_s for all users instead of / user server keypairs
+          - p_u derived from rwd and thus also P_u
 */
 
 #include "opaque.h"
@@ -566,7 +570,7 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec
 // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f K (0);
 // (e) Sends β, X s and c to U;
 // (f) Outputs (sid , ssid , SK).
-int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const uint8_t _rec[OPAQUE_USER_RECORD_LEN], const Opaque_Ids *ids, const Opaque_App_Infos *infos, uint8_t _resp[OPAQUE_SERVER_SESSION_LEN], uint8_t sk[crypto_secretbox_KEYBYTES], uint8_t km3[crypto_auth_hmacsha256_KEYBYTES], crypto_hash_sha256_state *xcript_state) {
+int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const uint8_t _rec[OPAQUE_USER_RECORD_LEN], const Opaque_Ids *ids, const Opaque_App_Infos *infos, uint8_t _resp[OPAQUE_SERVER_SESSION_LEN], uint8_t sk[crypto_secretbox_KEYBYTES],  Opaque_ServerAuthCTX *ctx) {
 
   Opaque_UserSession *pub = (Opaque_UserSession *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
@@ -642,7 +646,7 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
 
   // Mac(Km2; xcript2) - from the ietf cfrg draft
   uint8_t xcript[crypto_hash_sha256_BYTES];
-  get_xcript(xcript, xcript_state, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->c, resp->env_len, resp->nonceS, resp->X_s, infos);
+  get_xcript(xcript, &ctx->xcript_state, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->c, resp->env_len, resp->nonceS, resp->X_s, infos);
   crypto_auth_hmacsha256(resp->auth,                          // out
                          xcript,                              // in
                          crypto_hash_sha256_BYTES,            // len(in)
@@ -653,7 +657,7 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
 #endif
 
   memcpy(sk,keys.sk,sizeof(keys.sk));
-  memcpy(km3,keys.km3,sizeof(keys.km3));
+  memcpy(ctx->km3,keys.km3,sizeof(keys.km3));
   sodium_munlock(&keys,sizeof(keys));
 
 #ifdef TRACE
@@ -869,21 +873,21 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
 }
 
 // extra function to implement the hmac based auth as defined in the ietf cfrg draft
-int opaque_session_server_auth(const uint8_t km3[crypto_auth_hmacsha256_KEYBYTES], crypto_hash_sha256_state *state, const uint8_t authU[crypto_auth_hmacsha256_BYTES], const Opaque_App_Infos *infos) {
+int opaque_session_server_auth(Opaque_ServerAuthCTX *ctx, const uint8_t authU[crypto_auth_hmacsha256_BYTES], const Opaque_App_Infos *infos) {
   if(infos!=NULL) {
-    if(infos->info3!=NULL) crypto_hash_sha256_update(state, infos->info3, infos->info3_len);
-    if(infos->einfo3!=NULL) crypto_hash_sha256_update(state, infos->einfo3, infos->einfo3_len);
+    if(infos->info3!=NULL) crypto_hash_sha256_update(&ctx->xcript_state, infos->info3, infos->info3_len);
+    if(infos->einfo3!=NULL) crypto_hash_sha256_update(&ctx->xcript_state, infos->einfo3, infos->einfo3_len);
   }
   uint8_t xcript[crypto_hash_sha256_BYTES];
-  crypto_hash_sha256_final(state, xcript);
+  crypto_hash_sha256_final(&ctx->xcript_state, xcript);
 #ifdef TRACE
-  dump(km3,crypto_auth_hmacsha256_KEYBYTES,"km3 ");
+  dump(ctx->km3,crypto_auth_hmacsha256_KEYBYTES,"km3 ");
   dump(xcript, crypto_hash_sha256_BYTES, "xcript ");
   if(infos)
     dump((uint8_t*)infos, sizeof(Opaque_App_Infos), "infos ");
   dump(authU,crypto_auth_hmacsha256_BYTES, "authU ");
 #endif
-  return crypto_auth_hmacsha256_verify(authU, xcript, crypto_hash_sha256_BYTES, km3);
+  return crypto_auth_hmacsha256_verify(authU, xcript, crypto_hash_sha256_BYTES, ctx->km3);
 }
 
 // variant where the secrets of U never touch S unencrypted

@@ -67,6 +67,11 @@ typedef struct {
   size_t einfo3_len;
 } Opaque_App_Infos;
 
+typedef struct {
+  uint8_t km3[crypto_auth_hmacsha256_KEYBYTES];
+  crypto_hash_sha256_state xcript_state;
+} Opaque_ServerAuthCTX;
+
 /*
    This function implements the storePwdFile function from the
    paper. This function runs on the server and creates a new output
@@ -74,7 +79,7 @@ typedef struct {
    needs to implement the storage of this record and any binding to
    user names or as the paper suggests sid.
  */
-int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const uint8_t *key, const uint64_t key_len, const uint8_t *ClrEnv, const uint16_t ClrEnv_len, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]); 
+int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const uint8_t *key, const uint64_t key_len, const uint8_t *ClrEnv, const uint16_t ClrEnv_len, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /*
   This function initiates a new OPAQUE session, is the same as the
@@ -95,7 +100,8 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t sec[
   into a secret/shared session key sk and a response resp to be sent
   back to the user.
  */
-int opaque_session_srv(const uint8_t pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const uint8_t rec[OPAQUE_USER_RECORD_LEN], const Opaque_Ids *ids, const Opaque_App_Infos *infos, uint8_t resp[OPAQUE_SERVER_SESSION_LEN], uint8_t sk[crypto_secretbox_KEYBYTES], uint8_t km3[crypto_auth_hmacsha256_KEYBYTES], crypto_hash_sha256_state *state);
+
+int opaque_session_srv(const uint8_t pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const uint8_t rec[OPAQUE_USER_RECORD_LEN], const Opaque_Ids *ids, const Opaque_App_Infos *infos, uint8_t resp[OPAQUE_SERVER_SESSION_LEN], uint8_t sk[crypto_secretbox_KEYBYTES], Opaque_ServerAuthCTX *ctx);
 
 /*
  This is the same function as defined in the paper with the
@@ -125,7 +131,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const uint8
  info3/einfo3 is needed)
  the function returns 0 if the hmac verifies correctly.
  */
-int opaque_session_server_auth(const uint8_t km3[crypto_auth_hmacsha256_KEYBYTES], crypto_hash_sha256_state *state, const uint8_t authU[crypto_auth_hmacsha256_BYTES], const Opaque_App_Infos *infos);
+int opaque_session_server_auth(Opaque_ServerAuthCTX *ctx, const uint8_t authU[crypto_auth_hmacsha256_BYTES], const Opaque_App_Infos *infos);
 
 /* Alternative user initialization
  *
