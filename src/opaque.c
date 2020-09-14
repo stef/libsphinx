@@ -489,6 +489,7 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
     return -1;
   }
   sodium_munlock(rw0,sizeof rw0);
+  crypto_kdf_hkdf_sha256_extract(rw, (uint8_t*) "RwdU", 4, rw, sizeof rw);
 
 #ifdef TRACE
   dump((uint8_t*) rw, 32, "key ");
@@ -559,6 +560,7 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
 
 //(UsrSession, sid , ssid , S, pw): U picks r, x_u ←_R Z_q ; sets α := (H^0(pw))^r and
 //X_u := g^x_u ; sends α and X_u to S.
+// more or less corresponds to CreateCredentialRequest in the ietf draft
 int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret*) _sec;
   Opaque_UserSession *pub = (Opaque_UserSession*) _pub;
@@ -586,6 +588,7 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec
   return 0;
 }
 
+// more or less corresponds to CreateCredentialResponse in the ietf draft
 // 2. (SvrSession, sid , ssid ): On input α from U, S proceeds as follows:
 // (a) Checks that α ∈ G^∗ If not, outputs (abort, sid , ssid ) and halts;
 // (b) Retrieves file[sid] = {k_s, p_s, P_s, P_u, c};
@@ -697,6 +700,7 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
   return 0;
 }
 
+// more or less corresponds to RecoverCredentials in the ietf draft
 // 3. On β, X_s and c from S, U proceeds as follows:
 // (a) Checks that β ∈ G ∗ . If not, outputs (abort, sid , ssid ) and halts;
 // (b) Computes rw := H(key, pw|β^1/r );
@@ -768,7 +772,8 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
   if(key != NULL) {
      crypto_generichash_init(&state, key, key_len, 32);
   } else {
-     crypto_generichash_init(&state, 0, 0, 32);
+    uint8_t domain[]="RFCXXXX"; // todo set after RFC is published
+    crypto_generichash_init(&state, domain, (sizeof domain) - 1, 32);
   }
   crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
@@ -801,6 +806,8 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
     return -1;
   }
   sodium_munlock(rw0, sizeof rw0);
+  crypto_kdf_hkdf_sha256_extract(rw, (uint8_t*) "RwdU", 4, rw, sizeof rw);
+
 #ifdef TRACE
   dump(rw,sizeof(rw), "session user finish rw ");
 #endif
@@ -1027,6 +1034,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
     return -1;
   }
   sodium_munlock(rw0, sizeof(rw0));
+  crypto_kdf_hkdf_sha256_extract(rw, (uint8_t*) "RwdU", 4, rw, sizeof rw);
 
 #ifdef TRACE
   dump((uint8_t*) rw, 32, "key ");
