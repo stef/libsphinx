@@ -276,7 +276,6 @@ static int opaque_envelope(const uint8_t *rwd, const uint8_t *SecEnv, const size
   if(__builtin_add_overflow(2*crypto_hash_sha256_BYTES,SecEnv_len, &tmp)) return 1;
 
   // pad = HKDF-Expand(RwdU, concat(nonce, "Pad"), len(pt))
-  // auth_key = HKDF-Expand(RwdU, concat(nonce, "AuthKey"), Nh)
   char ctx[crypto_hash_sha256_BYTES+9];
   memcpy(ctx,envelope,crypto_hash_sha256_BYTES);
   memcpy(ctx+crypto_hash_sha256_BYTES,"Pad",3);
@@ -322,6 +321,7 @@ static int opaque_envelope(const uint8_t *rwd, const uint8_t *SecEnv, const size
   dump(ClrEnv,ClrEnv_len, "ClrEnv1 ");
 #endif
 
+  // auth_key = HKDF-Expand(RwdU, concat(nonce, "AuthKey"), Nh)
   uint8_t auth_key[crypto_hash_sha256_BYTES];
   memcpy(ctx+crypto_hash_sha256_BYTES,"AuthKey",7);
   sodium_mlock(auth_key, sizeof auth_key);
@@ -911,6 +911,7 @@ int opaque_session_server_auth(Opaque_ServerAuthCTX *ctx, const uint8_t authU[cr
 // variant where the secrets of U never touch S unencrypted
 
 // U computes: blinded PW
+// called CreateRegistrationRequest in the ietf cfrg rfc draft
 int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *alpha) {
   return sphinx_blindPW(pw, pwlen, r, alpha);
 }
@@ -920,6 +921,7 @@ int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t
 // (2) generates k_s ←_R Z_q,
 // (3) computes: β := α^k_s,
 // (4) finally generates: p_s ←_R Z_q, P_s := g^p_s;
+// called CreateRegistrationResponse in the ietf cfrg rfc draft
 int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]) {
   Opaque_RegisterSec *sec = (Opaque_RegisterSec *) _sec;
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
@@ -950,6 +952,7 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t _sec[OPAQUE_RE
 // (c) p_u ←_R Z_q
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
+// called FinalizeRequest in the ietf cfrg rfc draft
 int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
                                     const uint8_t *r,
                                     const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN],
@@ -1081,6 +1084,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
 }
 
 // S records file[sid ] := {k_s, p_s, P_s, P_u, c}.
+// called StoreUserRecord in the ietf cfrg rfc draft
 void opaque_private_init_srv_finish(const uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN], uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_RegisterSec *sec = (Opaque_RegisterSec *) _sec;
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
