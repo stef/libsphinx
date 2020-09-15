@@ -9,21 +9,12 @@
 
 #define OPAQUE_ENVELOPE_META_LEN (2*crypto_hash_sha256_BYTES + 2*sizeof(uint16_t))
 
-#define OPAQUE_BLOB_LEN (/*nonce*/  crypto_hash_sha256_BYTES+      \
-                         /* p_u */  crypto_scalarmult_SCALARBYTES+ \
-                         /* P_u */  crypto_scalarmult_BYTES+       \
-                         /* P_s */  crypto_scalarmult_BYTES+       \
-                         /* SecEnv_len */ sizeof(uint16_t)+        \
-                         /* ClrEnv_len */ sizeof(uint16_t)+        \
-                         /* mac */  crypto_hash_sha256_BYTES)
-
 
 #define OPAQUE_USER_RECORD_LEN (/* k_s */ crypto_core_ristretto255_SCALARBYTES+ \
                                 /* p_s */ crypto_scalarmult_SCALARBYTES+        \
                                 /* P_u */ crypto_scalarmult_BYTES+              \
                                 /* P_s */ crypto_scalarmult_BYTES+              \
-                                /* env_len */ sizeof(uint32_t)+                 \
-                                /* */ OPAQUE_BLOB_LEN)
+                                /* env_len */ sizeof(uint32_t))
 
 #define OPAQUE_USER_SESSION_PUBLIC_LEN (/* alpha */  crypto_core_ristretto255_BYTES+ \
                                         /* X_u */    crypto_scalarmult_BYTES+        \
@@ -38,8 +29,7 @@
                                    /* X_s */ crypto_scalarmult_BYTES+         \
                                    /* nonceS */ OPAQUE_NONCE_BYTES+           \
                                    /* auth */ crypto_auth_hmacsha256_BYTES+   \
-                                   /* env_len */ sizeof(uint32_t)+            \
-                                   /*  */ OPAQUE_BLOB_LEN)
+                                   /* env_len */ sizeof(uint32_t))
 
 #define OPAQUE_REGISTER_PUBLIC_LEN (/* beta */ crypto_core_ristretto255_BYTES+ \
                                     /* P_s */ crypto_scalarmult_BYTES)
@@ -48,10 +38,10 @@
                                     /* k_s */ crypto_core_ristretto255_SCALARBYTES)
 
 typedef struct {
-  const uint16_t idU_len;
-  const uint8_t *idU;
-  const uint16_t idS_len;
-  const uint8_t *idS;
+  uint16_t idU_len;
+  uint8_t *idU;
+  uint16_t idS_len;
+  uint8_t *idS;
 } Opaque_Ids;
 
 typedef struct {
@@ -72,6 +62,20 @@ typedef struct {
   crypto_hash_sha256_state xcript_state;
 } Opaque_ServerAuthCTX;
 
+typedef enum {
+  NotPackaged = 0,
+  InSecEnv = 1,
+  InClrEnv = 2
+} __attribute((packed)) Opaque_PkgTarget;
+
+typedef struct {
+  Opaque_PkgTarget skU : 2;
+  Opaque_PkgTarget pkU : 2;
+  Opaque_PkgTarget pkS : 2;
+  Opaque_PkgTarget idU : 2;
+  Opaque_PkgTarget idS : 2;
+} Opaque_PkgConfig;
+
 /*
    This function implements the storePwdFile function from the
    paper. This function runs on the server and creates a new output
@@ -79,7 +83,7 @@ typedef struct {
    needs to implement the storage of this record and any binding to
    user names or as the paper suggests sid.
  */
-int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const uint8_t *key, const uint64_t key_len, const uint8_t *ClrEnv, const uint16_t ClrEnv_len, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]);
+int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /*
   This function initiates a new OPAQUE session, is the same as the
@@ -115,7 +119,7 @@ int opaque_session_srv(const uint8_t pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const 
  function. If rwd is not NULL it is returned - this enables to run the
  sphinx protocol in the opaque protocol.
 */
-int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const uint8_t resp[OPAQUE_SERVER_SESSION_LEN], const uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_Ids *ids, Opaque_App_Infos *infos, uint8_t *sk, uint8_t rwd[crypto_secretbox_KEYBYTES], uint8_t auth[crypto_auth_hmacsha256_BYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
+int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const uint8_t resp[OPAQUE_SERVER_SESSION_LEN], const uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, Opaque_Ids *ids, Opaque_App_Infos *infos, uint8_t *sk, uint8_t rwd[crypto_secretbox_KEYBYTES], uint8_t auth[crypto_auth_hmacsha256_BYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /*
  This is a function not in the original paper, it comes from the
@@ -173,8 +177,7 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t sec[OPAQUE_REG
  * step to the server. If rwd is not NULL it * is returned - this
  * enables to run the sphinx protocol in the opaque protocol.
  */
-int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], const uint8_t *key, const uint64_t key_len, const uint8_t *ClrEnv, const uint16_t ClrEnv_len, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t rwd[crypto_secretbox_KEYBYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
-
+int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t rwd[crypto_secretbox_KEYBYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /*
  * The server combines the sec value from its run of its
@@ -187,5 +190,9 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const
  */
 //
 void opaque_private_init_srv_finish(const uint8_t sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], uint8_t rec[OPAQUE_USER_RECORD_LEN]);
+
+/* helper function
+ */
+size_t package_len(const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, Opaque_PkgTarget type);
 
 #endif // opaque_h
