@@ -59,6 +59,8 @@ typedef struct {
   uint8_t x_u[crypto_scalarmult_SCALARBYTES];
   uint8_t nonceU[OPAQUE_NONCE_BYTES];
   uint8_t alpha[crypto_core_ristretto255_BYTES];
+  uint32_t pwlen;
+  uint8_t pw[];
 } __attribute((packed)) Opaque_UserSession_Secret;
 
 typedef struct {
@@ -110,7 +112,7 @@ static int oprf(const uint8_t *pwd, const size_t pwd_len,
   uint8_t h0[crypto_core_ristretto255_HASHBYTES];
   sodium_mlock(h0,sizeof h0);
   // hash pwd with H0
-  crypto_generichash(h0, sizeof h0, pwd, pwd_len, 0, 0); // todo add salt
+  crypto_generichash(h0, sizeof h0, pwd, pwd_len, 0, 0);
 #ifdef TRACE
   dump(h0, sizeof h0, "h0");
 #endif
@@ -771,7 +773,7 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec
 
   if(0!=blind(pw, pwlen, sec->r, pub->alpha)) return -1;
 #ifdef TRACE
-  dump(_sec,OPAQUE_USER_SESSION_SECRET_LEN, "sec ");
+  dump(_sec,OPAQUE_USER_SESSION_SECRET_LEN+pwlen, "sec ");
   dump(_pub,OPAQUE_USER_SESSION_PUBLIC_LEN, "pub ");
 #endif
   memcpy(sec->alpha, pub->alpha, crypto_core_ristretto255_BYTES);
@@ -785,8 +787,12 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec
 
   // X_u := g^x_u
   crypto_scalarmult_base(pub->X_u, sec->x_u);
+
+  sec->pwlen = pwlen;
+  memcpy(sec->pw, pw, pwlen);
+
 #ifdef TRACE
-  dump(_sec,OPAQUE_USER_SESSION_SECRET_LEN, "sec ");
+  dump(_sec,OPAQUE_USER_SESSION_SECRET_LEN+pwlen, "sec ");
   dump(_pub,OPAQUE_USER_SESSION_PUBLIC_LEN, "pub ");
 #endif
   return 0;
@@ -912,8 +918,7 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
 //     Otherwise sets (p_u, P_u, P_s ) := AuthDec_rw (c);
 // (d) Computes K := KE(p_u, x_u, P_s, X_s) and SK := f_K(0);
 // (e) Outputs (sid, ssid, SK).
-int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
-                              const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
+int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
                               const uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN],
                               const uint8_t *key, const uint64_t key_len,
                               const Opaque_PkgConfig *cfg,
@@ -927,7 +932,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret *) _sec;
 
 #ifdef TRACE
-  dump(pw,pwlen, "session user finish pw ");
+  dump(sec->pw,sec->pwlen, "session user finish pw ");
   dump(key,key_len, "session user finish key ");
   dump(_sec,OPAQUE_USER_SESSION_SECRET_LEN, "session user finish sec ");
   dump(_resp,OPAQUE_SERVER_SESSION_LEN, "session user finish resp ");
@@ -981,7 +986,7 @@ int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen,
     uint8_t domain[]=RFCREF;
     crypto_generichash_init(&state, domain, (sizeof domain) - 1, 32);
   }
-  crypto_generichash_update(&state, pw, pwlen);
+  crypto_generichash_update(&state, sec->pw, sec->pwlen);
   crypto_generichash_update(&state, h0, 32);
   sodium_munlock(h0, sizeof(h0));
 

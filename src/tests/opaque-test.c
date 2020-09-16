@@ -55,7 +55,7 @@ int main(void) {
   if(0!=opaque_init_srv(pw, pwlen, key, key_len, &cfg, &ids, rec, export_key)) return 1;
 
   // initiate login
-  unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
+  unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN+pwlen], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
   printf("opaque_session_usr_start()\n");
   opaque_session_usr_start(pw, pwlen, sec, pub);
 
@@ -74,7 +74,7 @@ int main(void) {
   uint8_t idU[32], idS[32]; // must be big enough to fit ids
   Opaque_Ids ids1={4,idU,6,idS};
   //Opaque_App_Infos infos;
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &cfg, &ids1, NULL, pk, rwd, authU, export_key_x)) return 1;
+  if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, &ids1, NULL, pk, rwd, authU, export_key_x)) return 1;
   _dump(rwd,32,"rwd: ");
   _dump(pk,32,"sk_u: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
@@ -112,7 +112,7 @@ int main(void) {
   if(0!=opaque_session_srv(pub, rrec, &ids, NULL, resp, sk, &ctx)) return 1;
   _dump(sk,32,"sk_s: ");
   printf("opaque_session_usr_finish\n");
-  if(0!=opaque_session_usr_finish(pw, pwlen, resp, sec, key, key_len, &cfg, &ids1, NULL, pk, rwd, authU, export_key)) return 1;
+  if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, &ids1, NULL, pk, rwd, authU, export_key)) return 1;
   _dump(pk,32,"sk_u: ");
   _dump(rwd,32,"rwd: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);

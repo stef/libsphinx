@@ -23,7 +23,8 @@
 #define OPAQUE_USER_SESSION_SECRET_LEN (/* r */      crypto_core_ristretto255_SCALARBYTES+ \
                                         /* x_u */    crypto_scalarmult_SCALARBYTES+        \
                                         /* nonceU */ OPAQUE_NONCE_BYTES+                   \
-                                        /* alpha */  crypto_core_ristretto255_BYTES)
+                                        /* alpha */  crypto_core_ristretto255_BYTES+       \
+                                        /* pw_len */ sizeof(uint32_t))
 
 #define OPAQUE_SERVER_SESSION_LEN (/* beta */ crypto_core_ristretto255_BYTES+ \
                                    /* X_s */ crypto_scalarmult_BYTES+         \
@@ -119,7 +120,7 @@ int opaque_session_srv(const uint8_t pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const 
  function. If rwd is not NULL it is returned - this enables to run the
  sphinx protocol in the opaque protocol.
 */
-int opaque_session_usr_finish(const uint8_t *pw, const size_t pwlen, const uint8_t resp[OPAQUE_SERVER_SESSION_LEN], const uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, Opaque_Ids *ids, Opaque_App_Infos *infos, uint8_t *sk, uint8_t rwd[crypto_secretbox_KEYBYTES], uint8_t auth[crypto_auth_hmacsha256_BYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
+int opaque_session_usr_finish(const uint8_t resp[OPAQUE_SERVER_SESSION_LEN], const uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, Opaque_Ids *ids, Opaque_App_Infos *infos, uint8_t *sk, uint8_t rwd[crypto_secretbox_KEYBYTES], uint8_t auth[crypto_auth_hmacsha256_BYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /*
  This is a function not in the original paper, it comes from the
