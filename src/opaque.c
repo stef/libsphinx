@@ -928,7 +928,6 @@ int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
                               const Opaque_App_Infos *infos,
                               Opaque_Ids *ids,
                               uint8_t *sk,
-                              uint8_t rwd[crypto_secretbox_KEYBYTES],
                               uint8_t auth[crypto_auth_hmacsha256_BYTES],
                               uint8_t export_key[crypto_hash_sha256_BYTES]) {
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
@@ -1052,8 +1051,6 @@ int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
   dump((uint8_t*)&cred, sizeof cred, "unpacked cred ");
 #endif
 
-  if(rwd!=NULL)
-    crypto_generichash(rwd, crypto_secretbox_KEYBYTES, rw, crypto_secretbox_KEYBYTES, (const uint8_t*) "rwd", 3);
   sodium_munlock(rw, sizeof(rw));
 
   // mixing in things from the ietf cfrg spec
@@ -1086,7 +1083,6 @@ int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
 #endif
   if(0!=crypto_auth_hmacsha256_verify(resp->auth, xcript, crypto_hash_sha256_BYTES, keys.km2)) {
     sodium_munlock(&keys, sizeof(keys));
-    if(rwd!=NULL) sodium_memzero(rwd, crypto_secretbox_KEYBYTES);
     return -1;
   }
 
@@ -1182,7 +1178,6 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
                                     const Opaque_PkgConfig *cfg,
                                     const Opaque_Ids *ids,
                                     uint8_t _rec[OPAQUE_USER_RECORD_LEN],
-                                    uint8_t rwd[crypto_secretbox_KEYBYTES],
                                     uint8_t export_key[crypto_hash_sha256_BYTES]) {
 
   Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
@@ -1307,8 +1302,6 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
   dump(_rec, OPAQUE_USER_RECORD_LEN, "cipher user rec ");
 #endif
 
-  if(rwd!=NULL)
-    crypto_generichash(rwd, crypto_secretbox_KEYBYTES, rw, crypto_secretbox_KEYBYTES, (const uint8_t*)"rwd", 3);
   sodium_munlock(rw, sizeof(rw));
 
   return 0;

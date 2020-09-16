@@ -113,14 +113,11 @@ int opaque_session_srv(const uint8_t pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const 
  usrSessionEnd name. It is run by the user, and recieves as input the
  response from the previous server opaque_session_srv() function as
  well as the sec value from running the opaque_session_usr_start()
- function that initiated this protocol, the user password pw is also
- needed as an input to this final step. All these input parameters are
+ function that initiated this protocol, All these input parameters are
  transformed into a shared/secret session key pk, which should be the
- same as the one calculated by the opaque_session_srv()
- function. If rwd is not NULL it is returned - this enables to run the
- sphinx protocol in the opaque protocol.
+ same as the one calculated by the opaque_session_srv() function.
 */
-int opaque_session_usr_finish(const uint8_t resp[OPAQUE_SERVER_SESSION_LEN], const uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_App_Infos *infos, Opaque_Ids *ids, uint8_t *sk, uint8_t rwd[crypto_secretbox_KEYBYTES], uint8_t auth[crypto_auth_hmacsha256_BYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
+int opaque_session_usr_finish(const uint8_t resp[OPAQUE_SERVER_SESSION_LEN], const uint8_t sec[OPAQUE_USER_SESSION_SECRET_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_App_Infos *infos, Opaque_Ids *ids, uint8_t *sk, uint8_t auth[crypto_auth_hmacsha256_BYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /*
  This is a function not in the original paper, it comes from the
@@ -175,10 +172,9 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t sec[OPAQUE_REG
  * parameter can be used as an extra contribution to the derivation of
  * the rwd by means of being used as a key to the final hash. The
  * result of this is the value rec which should be passed for the last
- * step to the server. If rwd is not NULL it * is returned - this
- * enables to run the sphinx protocol in the opaque protocol.
+ * step to the server.
  */
-int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t rwd[crypto_secretbox_KEYBYTES], uint8_t export_key[crypto_hash_sha256_BYTES]);
+int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /*
  * The server combines the sec value from its run of its

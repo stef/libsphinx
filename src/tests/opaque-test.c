@@ -69,13 +69,11 @@ int main(void) {
 
   uint8_t pk[32];
   printf("opaque_session_usr_finish()\n");
-  uint8_t rwd[crypto_secretbox_KEYBYTES];
   uint8_t authU[crypto_auth_hmacsha256_BYTES];
   uint8_t idU[32], idS[32]; // must be big enough to fit ids
   Opaque_Ids ids1={4,idU,6,idS};
   //Opaque_App_Infos infos;
-  if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, NULL, &ids1, pk, rwd, authU, export_key_x)) return 1;
-  _dump(rwd,32,"rwd: ");
+  if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, NULL, &ids1, pk, authU, export_key_x)) return 1;
   _dump(pk,32,"sk_u: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
   assert(sodium_memcmp(export_key,export_key_x,sizeof export_key)==0);
@@ -101,7 +99,7 @@ int main(void) {
   // user commits its secrets
   unsigned char rrec[OPAQUE_USER_RECORD_LEN+env_len];
   printf("opaque_private_init_usr_respond\n");
-  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, key, key_len, &cfg, &ids, rrec, rwd, export_key)) return 1;
+  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, key, key_len, &cfg, &ids, rrec, export_key)) return 1;
   // server "saves"
   printf("opaque_private_init_srv_finish\n");
   opaque_private_init_srv_finish(rsec, rpub, rrec);
@@ -112,9 +110,8 @@ int main(void) {
   if(0!=opaque_session_srv(pub, rrec, &ids, NULL, resp, sk, &ctx)) return 1;
   _dump(sk,32,"sk_s: ");
   printf("opaque_session_usr_finish\n");
-  if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, NULL, &ids1, pk, rwd, authU, export_key)) return 1;
+  if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, NULL, &ids1, pk, authU, export_key)) return 1;
   _dump(pk,32,"sk_u: ");
-  _dump(rwd,32,"rwd: ");
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
 
   // authenticate both parties:
