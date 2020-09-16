@@ -234,7 +234,7 @@ static void get_xcript(uint8_t xcript[crypto_hash_sha256_BYTES],
 
 #ifdef TRACE
   if(xcript_state!=NULL) dump((uint8_t*)xcript_state,sizeof state, "xcript_state ");
-  else printf("no xcript_state\n");
+  else fprintf(stderr,"no xcript_state\n");
   dump(oprf1,crypto_core_ristretto255_BYTES, "oprf1 ");
   dump(nonceU,OPAQUE_NONCE_BYTES,"nonceU ");
   dump(epubu,crypto_scalarmult_BYTES,"epubu ");
@@ -243,7 +243,7 @@ static void get_xcript(uint8_t xcript[crypto_hash_sha256_BYTES],
   dump(nonceS,OPAQUE_NONCE_BYTES,"nonceS ");
   dump(epubs,crypto_scalarmult_BYTES,"epubs ");
   if(infos) dump( (uint8_t*) infos, sizeof(Opaque_App_Infos), "infos ");
-  else printf("no infos\n");
+  else fprintf(stderr,"no infos\n");
 #endif
 
   crypto_hash_sha256_update(&state, oprf1, crypto_core_ristretto255_BYTES);
@@ -500,7 +500,7 @@ static int opaque_envelope_open(const uint8_t *rwd, const uint8_t *envelope, con
   *SecEnv_len=sl;
   *ClrEnv_len=cl;
 #ifdef TRACE
-  printf("SecEnv_len: %d\nClrEnv_len: %d\n", sl, cl);
+  fprintf(stderr,"SecEnv_len: %d\nClrEnv_len: %d\n", sl, cl);
 #endif
   // sanity check the two lengths, already authenticated by the hmac above, but make sure the sender is not some joker
   if(env_len != sl + cl + 2*sizeof(uint16_t) + 2*crypto_hash_sha256_BYTES) return 1;

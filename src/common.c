@@ -3,10 +3,10 @@
 #ifdef TRACE
 void dump(const uint8_t *p, const size_t len, const char* msg) {
   size_t i;
-  printf("%s ",msg);
+  fprintf(stderr,"%s ",msg);
   for(i=0;i<len;i++)
-    printf("%02x", p[i]);
-  printf("\n");
+    fprintf(stderr,"%02x", p[i]);
+  fprintf(stderr,"\n");
 }
 #endif // TRACE
 
