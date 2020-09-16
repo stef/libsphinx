@@ -276,16 +276,19 @@ static void get_xcript(uint8_t xcript[crypto_hash_sha256_BYTES],
 
 //opaque_session_srv
 static void get_xcript_srv(uint8_t xcript[crypto_hash_sha256_BYTES],
+                           Opaque_ServerAuthCTX *ctx,
                            const Opaque_UserSession *pub,
                            const Opaque_ServerSession *resp,
-                           Opaque_ServerAuthCTX *ctx,
                            const Opaque_App_Infos *infos) {
-  get_xcript(xcript, &ctx->xcript_state, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->envelope, resp->env_len, resp->nonceS, resp->X_s, infos, 0);
+  if(ctx!=NULL) 
+    get_xcript(xcript, &ctx->xcript_state, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->envelope, resp->env_len, resp->nonceS, resp->X_s, infos, 0);
+  else
+    get_xcript(xcript, 0, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->envelope, resp->env_len, resp->nonceS, resp->X_s, infos, 0);
 }
 // session user finish
 static void get_xcript_usr(uint8_t xcript[crypto_hash_sha256_BYTES],
                            const Opaque_UserSession_Secret *sec,
-                           Opaque_ServerSession *resp,
+                           const Opaque_ServerSession *resp,
                            const uint8_t *env,
                            const uint8_t X_u[crypto_scalarmult_BYTES],
                            const Opaque_App_Infos *infos,
@@ -882,7 +885,7 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
 
   // Mac(Km2; xcript2) - from the ietf cfrg draft
   uint8_t xcript[crypto_hash_sha256_BYTES];
-  get_xcript_srv(xcript, pub, resp, ctx, infos);
+  get_xcript_srv(xcript, ctx, pub, resp, infos);
   crypto_auth_hmacsha256(resp->auth,                          // out
                          xcript,                              // in
                          crypto_hash_sha256_BYTES,            // len(in)
