@@ -1185,9 +1185,9 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
 
   const uint16_t ClrEnv_len = package_len(cfg, ids, InClrEnv);
   const uint16_t SecEnv_len = package_len(cfg, ids, InSecEnv);
-  const uint32_t env_len = OPAQUE_ENVELOPE_META_LEN + SecEnv_len + ClrEnv_len;
 
 #ifdef TRACE
+  const uint32_t env_len = OPAQUE_ENVELOPE_META_LEN + SecEnv_len + ClrEnv_len;
   memset(_rec,0,OPAQUE_USER_RECORD_LEN+env_len);
 #endif
 
