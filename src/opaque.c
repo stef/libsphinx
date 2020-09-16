@@ -280,10 +280,10 @@ static void get_xcript_srv(uint8_t xcript[crypto_hash_sha256_BYTES],
                            const Opaque_UserSession *pub,
                            const Opaque_ServerSession *resp,
                            const Opaque_App_Infos *infos) {
-  if(ctx!=NULL) 
+  if(ctx!=NULL)
     get_xcript(xcript, &ctx->xcript_state, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->envelope, resp->env_len, resp->nonceS, resp->X_s, infos, 0);
   else
-    get_xcript(xcript, 0, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->envelope, resp->env_len, resp->nonceS, resp->X_s, infos, 0);
+    get_xcript(xcript, NULL, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->envelope, resp->env_len, resp->nonceS, resp->X_s, infos, 0);
 }
 // session user finish
 static void get_xcript_usr(uint8_t xcript[crypto_hash_sha256_BYTES],
