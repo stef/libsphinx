@@ -1,7 +1,6 @@
 PREFIX?=/usr/local
-INC=-I/usr/include/sodium
 LIBS=-lsodium
-CFLAGS=$(INC) -march=native -Wall -fPIC -fPIE -O2 -g #-DTRACE
+CFLAGS=-march=native -Wall -fPIC -O2 -g -DTRACE -DNORANDOM $(INC)
 LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
@@ -31,7 +30,7 @@ android: LIBS=-Wl,-Bstatic -Wl,-Bdynamic -lsodiumjni -L.
 android: EXTRA_OBJECTS=jni.o
 android: jni.o libsphinx.so
 
-tests$(EXT): tests/sphinx$(EXT) tests/opaque$(EXT)
+tests$(EXT): tests/sphinx$(EXT) tests/opaque$(EXT) tests/opaque-munit
 
 bin/challenge$(EXT): bin/challenge.c
 	$(CC) $(CFLAGS) -o bin/challenge$(EXT) bin/challenge.c $(LDFLAGS)
@@ -53,6 +52,12 @@ tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 
 tests/opaque$(EXT): tests/opaque-test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/opaque$(EXT) tests/opaque-test.c -L. -lsphinx $(LDFLAGS)
+
+tests/opaque-munit$(EXT): tests/opaque_munit.c libsphinx.$(SOEXT) 
+	$(CC) $(CFLAGS) -o tests/munit-opaque$(EXT) tests/munit/munit.c tests/opaque_munit.c -lsphinx $(LDFLAGS)
+
+test: tests/opaque-munit$(EXT)
+	LD_PRELOAD=./libsphinx.so ./tests/munit-opaque
 
 win/libsodium-win64:
 	@echo 'win/libsodium-win64 not found.'
@@ -76,7 +81,7 @@ $(PREFIX)/include/opaque.h: opaque.h
 
 clean:
 	rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so
-	rm -f tests/sphinx tests/opaque tests/sphinx.exe tests/opaque.exe *.o
+	rm -f tests/sphinx tests/opaque tests/sphinx.exe tests/opaque.exe *.o tests/opaque-munit$(EXT)
 	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
 .PHONY: bin clean install
