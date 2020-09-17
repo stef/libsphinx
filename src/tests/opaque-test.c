@@ -74,7 +74,7 @@ int main(void) {
   printf("opaque_session_usr_finish()\n");
   uint8_t authU[crypto_auth_hmacsha256_BYTES];
   uint8_t idU[ids.idU_len], idS[ids.idS_len]; // must be big enough to fit ids
-  Opaque_Ids ids1={sizeof idU,idU, sizeof idU ,idS};
+  Opaque_Ids ids1={sizeof idU,idU, sizeof idS ,idS};
   //Opaque_App_Infos infos;
   if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, NULL, &ids1, pk, authU, export_key_x)) return 1;
   _dump(pk,32,"sk_u: ");
