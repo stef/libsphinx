@@ -140,7 +140,7 @@ static int oprf(const uint8_t *pwd, const size_t pwd_len,
   // hash(pwd||H0^k)
   crypto_generichash_state state;
   sodium_mlock(&state, sizeof state);
-  if(key != NULL) {
+  if(key != NULL && key_len!=0) {
      crypto_generichash_init(&state, key, key_len, 32);
   } else {
     uint8_t domain[]=RFCREF;
@@ -211,8 +211,8 @@ static void calc_info(char info[crypto_hash_sha256_BYTES],
 
   crypto_hash_sha256_update(&state, nonceU, OPAQUE_NONCE_BYTES);
   crypto_hash_sha256_update(&state, nonceS, OPAQUE_NONCE_BYTES);
-  if(ids->idU!=NULL) crypto_hash_sha256_update(&state, ids->idU, ids->idU_len);
-  if(ids->idS!=NULL) crypto_hash_sha256_update(&state, ids->idS, ids->idS_len);
+  if(ids->idU!=NULL && ids->idU_len > 0) crypto_hash_sha256_update(&state, ids->idU, ids->idU_len);
+  if(ids->idS!=NULL && ids->idS_len > 0) crypto_hash_sha256_update(&state, ids->idS, ids->idS_len);
 
   crypto_hash_sha256_final(&state, (uint8_t *) info);
 }
@@ -561,6 +561,7 @@ static int extend_package(const uint8_t *src, const size_t src_len, const Opaque
   uint8_t **target_ptr;
   if(ptype==InSecEnv) target_ptr=SecEnv;
   else if(ptype==InClrEnv) target_ptr=ClrEnv;
+  else if(ptype==NotPackaged) return 0;
   else return 1;
 
   CredentialExtension *target = (CredentialExtension*) *target_ptr;
@@ -611,12 +612,16 @@ static int extract_credential(const Opaque_PkgConfig *cfg, const Opaque_PkgTarge
   };
   case idU: {
     if(cfg->idU!=current_target) return 1;
+    if(ids->idU_len < cred->size) return 1;
     memcpy(ids->idU, &cred->data, cred->size);
+    ids->idU_len = cred->size;
     break;
   };
   case idS: {
     if(cfg->idS!=current_target) return 1;
+    if(ids->idS_len < cred->size) return 1;
     memcpy(ids->idS, &cred->data, cred->size);
+    ids->idS_len = cred->size;
     break;
   };
   default: return 1;
@@ -646,6 +651,7 @@ static int unpack(const Opaque_PkgConfig *cfg, const uint8_t *SecEnv, const uint
   if(cfg->pkU == NotPackaged) {
     if(!(seen & (1 << (skU-1)))) return 1;
     crypto_scalarmult_base(creds->P_u, creds->p_u);
+    seen|=(1 << (pkU - 1));
   }
   if(seen!=0x1f) return 1;
   return 0;
@@ -748,7 +754,7 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
   }
   sodium_munlock(&cred, sizeof cred);
   // c ← AuthEnc_rw(p_u,P_u,P_s);
-  if(0!=opaque_envelope(rw, SecEnv, SecEnv_len, ClrEnv, ClrEnv_len, rec->envelope, export_key)) {
+  if(0!=opaque_envelope(rw, SecEnv_len ? SecEnv : NULL, SecEnv_len, ClrEnv_len ? ClrEnv : NULL, ClrEnv_len, rec->envelope, export_key)) {
     return -1;
   }
   rec->env_len = env_len;
@@ -982,7 +988,7 @@ int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
     sodium_munlock(h0,sizeof h0);
     return -1;
   }
-  if(key != NULL) {
+  if(key != NULL && key_len!=0) {
      crypto_generichash_init(&state, key, key_len, 32);
   } else {
     uint8_t domain[]=RFCREF;
@@ -1154,12 +1160,21 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t _sec[OPAQUE_RE
   if (crypto_scalarmult_ristretto255(pub->beta, sec->k_s, alpha) != 0) {
     return -1;
   }
+#ifdef TRACE
+  dump((uint8_t*) pub->beta, sizeof pub->beta, "beta ");
+#endif
 
   // p_s ←_R Z_q
   randombytes(sec->p_s, crypto_scalarmult_SCALARBYTES); // random server long-term key
+#ifdef TRACE
+  dump((uint8_t*) sec->p_s, sizeof sec->p_s, "p_s ");
+#endif
 
   // P_s := g^p_s
   crypto_scalarmult_base(pub->P_s, sec->p_s);
+#ifdef TRACE
+  dump((uint8_t*) pub->P_s, sizeof pub->P_s, "P_s ");
+#endif
 
   return 0;
 }
@@ -1216,6 +1231,9 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
     return -1;
   }
   sodium_munlock(ir, sizeof ir);
+#ifdef TRACE
+  dump((uint8_t*) h0, sizeof h0, "h0_k ");
+#endif
 
   // rw = H(pw, β^(1/r))
   crypto_generichash_state state;
@@ -1223,10 +1241,11 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
     sodium_munlock(h0, sizeof h0);
     return -1;
   }
-  if(key != NULL) {
-     crypto_generichash_init(&state, key, key_len, 32);
+  if(key != NULL && key_len!=0) {
+    crypto_generichash_init(&state, key, key_len, 32);
   } else {
-     crypto_generichash_init(&state, 0, 0, 32);
+    uint8_t domain[]=RFCREF;
+    crypto_generichash_init(&state, domain, (sizeof domain) - 1, 32);
   }
   crypto_generichash_update(&state, pw, pwlen);
   crypto_generichash_update(&state, h0, 32);
@@ -1293,7 +1312,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
     return -1;
   }
   sodium_munlock(&cred, sizeof cred);
-  if(0!=opaque_envelope(rw, SecEnv, SecEnv_len, ClrEnv, ClrEnv_len, rec->envelope, export_key)) {
+  if(0!=opaque_envelope(rw, SecEnv_len ? SecEnv : NULL, SecEnv_len, ClrEnv_len ? ClrEnv : NULL, ClrEnv_len, rec->envelope, export_key)) {
     return -1;
   }
   rec->env_len = OPAQUE_ENVELOPE_META_LEN + SecEnv_len + ClrEnv_len;
