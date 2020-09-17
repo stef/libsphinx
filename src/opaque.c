@@ -209,6 +209,14 @@ static void calc_info(char info[crypto_hash_sha256_BYTES],
   crypto_hash_sha256_state state;
   crypto_hash_sha256_init(&state);
 
+#ifdef TRACE
+  fprintf(stderr,"calc info\n");
+  dump(ids->idU, ids->idU_len,"idU ");
+  dump(ids->idS, ids->idS_len,"idS ");
+  dump(nonceU, OPAQUE_NONCE_BYTES, "nonceU ");
+  dump(nonceS, OPAQUE_NONCE_BYTES, "nonceS ");
+#endif
+
   crypto_hash_sha256_update(&state, nonceU, OPAQUE_NONCE_BYTES);
   crypto_hash_sha256_update(&state, nonceS, OPAQUE_NONCE_BYTES);
   if(ids->idU!=NULL && ids->idU_len > 0) crypto_hash_sha256_update(&state, ids->idU, ids->idU_len);
@@ -778,7 +786,10 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
 int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec[OPAQUE_USER_SESSION_SECRET_LEN], uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN]) {
   Opaque_UserSession_Secret *sec = (Opaque_UserSession_Secret*) _sec;
   Opaque_UserSession *pub = (Opaque_UserSession*) _pub;
-  // todo append pwlen, pw to end of sec and remove it from teh user_finish fn params
+#ifdef TRACE
+  memset(_sec, 0, OPAQUE_USER_SESSION_SECRET_LEN+pwlen);
+  memset(_pub, 0, OPAQUE_USER_SESSION_PUBLIC_LEN);
+#endif
 
   if(0!=blind(pw, pwlen, sec->r, pub->alpha)) return -1;
 #ifdef TRACE
