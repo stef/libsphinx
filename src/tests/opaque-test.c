@@ -37,6 +37,8 @@ int main(void) {
   uint8_t export_key[crypto_hash_sha256_BYTES];
   uint8_t export_key_x[crypto_hash_sha256_BYTES];
   Opaque_Ids ids={4,(uint8_t*)"user",6,(uint8_t*)"server"};
+  ids.idU_len = strlen((char*) ids.idU);
+  ids.idS_len = strlen((char*) ids.idS);
   Opaque_PkgConfig cfg={
                         .skU = InSecEnv,
                         .pkU = InSecEnv,
@@ -44,6 +46,7 @@ int main(void) {
                         .idS = InClrEnv,
                         .idU = InClrEnv,
   };
+  _dump((uint8_t*) &cfg,sizeof cfg, "cfg ");
   const uint16_t ClrEnv_len = package_len(&cfg, &ids, InClrEnv);
   const uint16_t SecEnv_len = package_len(&cfg, &ids, InSecEnv);
   const uint32_t env_len = OPAQUE_ENVELOPE_META_LEN + SecEnv_len + ClrEnv_len;
@@ -70,8 +73,8 @@ int main(void) {
   uint8_t pk[32];
   printf("opaque_session_usr_finish()\n");
   uint8_t authU[crypto_auth_hmacsha256_BYTES];
-  uint8_t idU[32], idS[32]; // must be big enough to fit ids
-  Opaque_Ids ids1={4,idU,6,idS};
+  uint8_t idU[ids.idU_len], idS[ids.idS_len]; // must be big enough to fit ids
+  Opaque_Ids ids1={sizeof idU,idU, sizeof idU ,idS};
   //Opaque_App_Infos infos;
   if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, NULL, &ids1, pk, authU, export_key_x)) return 1;
   _dump(pk,32,"sk_u: ");
