@@ -661,7 +661,13 @@ static int unpack(const Opaque_PkgConfig *cfg, const uint8_t *SecEnv, const uint
     crypto_scalarmult_base(creds->P_u, creds->p_u);
     seen|=(1 << (pkU - 1));
   }
-  if(seen!=0x1f) return 1;
+
+  if(seen!=(((!!cfg->skU) | (1 << 1) | ((!!cfg->pkS) << 2) | ((!!cfg->idU) << 3) | ((!!cfg->idS) << 4)))) {
+#ifdef TRACE
+    fprintf(stderr, "seen: %x, expected: %x\n", seen, (((!!cfg->skU) | (1 << 1) | ((!!cfg->pkS) << 2) | ((!!cfg->idU) << 3) | ((!!cfg->idS) << 4))));
+#endif
+      return 1;
+    }
   return 0;
 }
 

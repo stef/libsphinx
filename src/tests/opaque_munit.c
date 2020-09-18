@@ -123,6 +123,16 @@ MunitResult server_init(const MunitParameter params[], void* user_data_or_fixtur
   uint8_t authU[crypto_auth_hmacsha256_BYTES];
   uint8_t idU[ids.idU_len], idS[ids.idS_len]; // must be big enough to fit ids
   Opaque_Ids ids1={sizeof idU,idU,sizeof idS,idS};
+  // in case we omit the id* in the envelope we must provide it before-hand.
+  // if it is in the envelope it will be populated from the envelope
+  if(cfg->idU == NotPackaged) {
+    ids1.idU_len = ids.idU_len;
+    memcpy(idU, ids.idU, ids.idU_len);
+  }
+  if(cfg->idS == NotPackaged) {
+    ids1.idS_len = ids.idS_len;
+    memcpy(idS, ids.idS, ids.idS_len);
+  }
   //Opaque_App_Infos infos;
   if(0!=opaque_session_usr_finish(resp, sec, key, key_len, cfg, NULL, &ids1, pk, authU, export_key_x)) return MUNIT_FAIL;
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
@@ -162,6 +172,16 @@ MunitResult private_init(const MunitParameter params[], void* user_data_or_fixtu
   uint8_t authU[crypto_auth_hmacsha256_BYTES];
   uint8_t idU[ids.idU_len], idS[ids.idS_len]; // must be big enough to fit ids
   Opaque_Ids ids1={sizeof idU,idU,sizeof idS,idS};
+  // in case we omit the id* in the envelope we must provide it before-hand.
+  // if it is in the envelope it will be populated from the envelope
+  if(cfg->idU == NotPackaged) {
+    ids1.idU_len = ids.idU_len;
+    memcpy(idU, ids.idU, ids.idU_len);
+  }
+  if(cfg->idS == NotPackaged) {
+    ids1.idS_len = ids.idS_len;
+    memcpy(idS, ids.idS, ids.idS_len);
+  }
   Opaque_ServerAuthCTX ctx;
 
   uint8_t alpha[crypto_core_ristretto255_BYTES];
