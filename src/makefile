@@ -57,7 +57,7 @@ tests/opaque-munit$(EXT): tests/opaque_munit.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/munit-opaque$(EXT) tests/munit/munit.c tests/opaque_munit.c -lsphinx $(LDFLAGS)
 
 test: tests/opaque-munit$(EXT)
-	LD_PRELOAD=./libsphinx.so ./tests/munit-opaque
+	LD_PRELOAD=./libsphinx.so ./tests/munit-opaque --fatal-failures
 
 win/libsodium-win64:
 	@echo 'win/libsodium-win64 not found.'
