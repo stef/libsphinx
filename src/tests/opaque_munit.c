@@ -52,22 +52,60 @@ static char* idS_params[] = {
 };
 
 static char* cfg_params[]=
-  {
-   "\x95\x02",
-   "\x95\x01",
-   "\x55\x01",
-   "\x55\x02",
-   "\x51\x02",   //   : pkU not included
-   "\x51\x01",
-   "\x91\x01",
-   "\x91\x02",
-   "\x59\x02",   //   : pkU in ClrEnv
-   "\x59\x01",
-   "\x99\x02",
-   "\x99\x01",
-   "\x69\x01",   //   : pkU and pkS in ClrEnv
-   "\xa9\x02",   //   : everything in ClrEnv, except skU
-   "\x21\x00",   //   skU = InSecEnv, pkU = NotPackaged, pkS = InClrEnv, idU = NotPackaged, idS = NotPackaged
+  {"\x04",
+   "\x44",
+   "\x84",
+   "\x14",
+   "\x54",
+   "\x94",
+   "\x24",
+   "\x64",
+   "\xa4",
+   "\x08",
+   "\x48",
+   "\x88",
+   "\x18",
+   "\x58",
+   "\x98",
+   "\x28",
+   "\x68",
+   "\xa8",
+   "\x05",
+   "\x45",
+   "\x85",
+   "\x15",
+   "\x55",
+   "\x95",
+   "\x25",
+   "\x65",
+   "\xa5",
+   "\x09",
+   "\x49",
+   "\x89",
+   "\x19",
+   "\x59",
+   "\x99",
+   "\x29",
+   "\x69",
+   "\xa9",
+   "\x06",
+   "\x46",
+   "\x86",
+   "\x16",
+   "\x56",
+   "\x96",
+   "\x26",
+   "\x66",
+   "\xa6",
+   "\x0a",
+   "\x4a",
+   "\x8a",
+   "\x1a",
+   "\x5a",
+   "\x9a",
+   "\x2a",
+   "\x6a",
+   "\xaa",
    NULL
 };
 
@@ -95,7 +133,7 @@ MunitResult server_init(const MunitParameter params[], void* user_data_or_fixtur
   ids.idS_len = strlen((char*)ids.idS);
 
   Opaque_PkgConfig *cfg=(Opaque_PkgConfig *) munit_parameters_get(params, "cfg");
-  fprintf(stderr, "cfg sku:%d, pku:%d, pks:%d, idu:%d, ids:%d\n", cfg->skU, cfg->pkU, cfg->pkS, cfg->idU, cfg->idS);
+  fprintf(stderr, "cfg pku:%d, pks:%d, idu:%d, ids:%d\n", cfg->pkU, cfg->pkS, cfg->idU, cfg->idS);
 
   const uint16_t ClrEnv_len = package_len(cfg, &ids, InClrEnv);
   const uint16_t SecEnv_len = package_len(cfg, &ids, InSecEnv);

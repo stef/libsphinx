@@ -555,7 +555,7 @@ static int opaque_envelope_open(const uint8_t *rwd, const uint8_t *envelope, con
 // helper to calculate size of *Env parts of envelopes
 size_t package_len(const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, Opaque_PkgTarget type) {
   size_t res=0;
-  if(cfg->skU==type) res+=crypto_scalarmult_SCALARBYTES+3;
+  if(type==InSecEnv) res+=crypto_scalarmult_SCALARBYTES+3; // sku always in secenv
   if(cfg->pkU==type) res+=crypto_scalarmult_BYTES+3;
   if(cfg->pkS==type) res+=crypto_scalarmult_BYTES+3;
   if(cfg->idU==type) res+=ids->idU_len+3;
@@ -585,7 +585,7 @@ static int extend_package(const uint8_t *src, const size_t src_len, const Opaque
 // takes skU, pkU, pkS, idU, idS and puts them into SecEnv or ClrEnv according to configuration
 static int pack(const Opaque_PkgConfig *cfg, const Opaque_Credentials *cred, const Opaque_Ids *ids, uint8_t *SecEnv, uint8_t *ClrEnv) {
   uint8_t *senv = SecEnv, *cenv = ClrEnv;
-  if(0!=extend_package(cred->p_u, crypto_scalarmult_SCALARBYTES, cfg->skU, skU, &senv, &cenv)) return 1;
+  if(0!=extend_package(cred->p_u, crypto_scalarmult_SCALARBYTES, InSecEnv, skU, &senv, &cenv)) return 1;
   if(0!=extend_package(cred->P_u, crypto_scalarmult_BYTES, cfg->pkU, pkU, &senv, &cenv)) return 1;
   if(0!=extend_package(cred->P_s, crypto_scalarmult_BYTES, cfg->pkS, pkS, &senv, &cenv)) return 1;
   if(0!=extend_package(ids->idU, ids->idU_len, cfg->idU, idU, &senv, &cenv)) return 1;
@@ -601,7 +601,7 @@ static int extract_credential(const Opaque_PkgConfig *cfg, const Opaque_PkgTarge
   // validate that the cred is in the correct part of the envelope
   switch(cred->type) {
   case skU: {
-    if(cfg->skU!=current_target) return 1;
+    if(InSecEnv!=current_target) return 1;
     if(cred->size!=crypto_scalarmult_SCALARBYTES) return 1;
     memcpy(&creds->p_u, &cred->data, crypto_scalarmult_SCALARBYTES);
     break;
@@ -662,9 +662,9 @@ static int unpack(const Opaque_PkgConfig *cfg, const uint8_t *SecEnv, const uint
     seen|=(1 << (pkU - 1));
   }
 
-  if(seen!=(((!!cfg->skU) | (1 << 1) | ((!!cfg->pkS) << 2) | ((!!cfg->idU) << 3) | ((!!cfg->idS) << 4)))) {
+  if(seen!=( 3 | ((!!cfg->pkS) << 2) | ((!!cfg->idU) << 3) | ((!!cfg->idS) << 4) )) {
 #ifdef TRACE
-    fprintf(stderr, "seen: %x, expected: %x\n", seen, (((!!cfg->skU) | (1 << 1) | ((!!cfg->pkS) << 2) | ((!!cfg->idU) << 3) | ((!!cfg->idS) << 4))));
+    fprintf(stderr, "seen: %x, expected: %x\n", seen, (3 | ((!!cfg->pkS) << 2) | ((!!cfg->idU) << 3) | ((!!cfg->idS) << 4)));
 #endif
       return 1;
     }

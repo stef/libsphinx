@@ -40,7 +40,6 @@ int main(void) {
   ids.idU_len = strlen((char*) ids.idU);
   ids.idS_len = strlen((char*) ids.idS);
   Opaque_PkgConfig cfg={
-                        .skU = InSecEnv,
                         .pkU = NotPackaged,
                         .pkS = InClrEnv,
                         .idS = NotPackaged,

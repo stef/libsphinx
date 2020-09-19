@@ -70,7 +70,6 @@ typedef enum {
 } __attribute((packed)) Opaque_PkgTarget;
 
 typedef struct {
-  Opaque_PkgTarget skU : 2;
   Opaque_PkgTarget pkU : 2;
   Opaque_PkgTarget pkS : 2;
   Opaque_PkgTarget idU : 2;
