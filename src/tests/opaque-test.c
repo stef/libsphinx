@@ -98,10 +98,10 @@ int main(void) {
 
   // variant where user registration does not leak secrets to server
   uint8_t alpha[crypto_core_ristretto255_BYTES];
-  uint8_t r[crypto_core_ristretto255_SCALARBYTES];
+  uint8_t usr_ctx[OPAQUE_REGISTER_USER_SEC_LEN+pwlen];
   // user initiates:
   printf("opaque_private_init_usr_start\n");
-  if(0!=opaque_private_init_usr_start(pw, pwlen, r, alpha)) return 1;
+  if(0!=opaque_private_init_usr_start(pw, pwlen, usr_ctx, alpha)) return 1;
   // server responds
   unsigned char rsec[OPAQUE_REGISTER_SECRET_LEN], rpub[OPAQUE_REGISTER_PUBLIC_LEN];
   printf("opaque_private_init_srv_respond\n");
@@ -109,7 +109,7 @@ int main(void) {
   // user commits its secrets
   unsigned char rrec[OPAQUE_USER_RECORD_LEN+env_len];
   printf("opaque_private_init_usr_respond\n");
-  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, key, key_len, &cfg, &ids, rrec, export_key)) return 1;
+  if(0!=opaque_private_init_usr_respond(usr_ctx, rpub, key, key_len, &cfg, &ids, rrec, export_key)) return 1;
   // server "saves"
   printf("opaque_private_init_srv_finish\n");
   opaque_private_init_srv_finish(rsec, rpub, rrec);

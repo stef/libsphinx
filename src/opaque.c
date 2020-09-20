@@ -73,14 +73,20 @@ typedef struct {
 } __attribute((packed)) Opaque_ServerSession;
 
 typedef struct {
+  uint8_t r[crypto_core_ristretto255_BYTES];
+  size_t pwlen;
+  uint8_t pw[];
+} Opaque_RegisterUserSec;
+
+typedef struct {
   uint8_t beta[crypto_core_ristretto255_BYTES];
   uint8_t P_s[crypto_scalarmult_BYTES];
-} __attribute((packed)) Opaque_RegisterPub;
+} __attribute((packed)) Opaque_RegisterSrvPub;
 
 typedef struct {
   uint8_t p_s[crypto_scalarmult_SCALARBYTES];
   uint8_t k_s[crypto_core_ristretto255_SCALARBYTES];
-} __attribute((packed)) Opaque_RegisterSec;
+} __attribute((packed)) Opaque_RegisterSrvSec;
 
 typedef struct {
   uint8_t sk[32];
@@ -1153,8 +1159,11 @@ int opaque_session_server_auth(Opaque_ServerAuthCTX *ctx, const uint8_t authU[cr
 
 // U computes: blinded PW
 // called CreateRegistrationRequest in the ietf cfrg rfc draft
-int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *alpha) {
-  return blind(pw, pwlen, r, alpha);
+int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec[sizeof(Opaque_RegisterUserSec)+pwlen], uint8_t *alpha) {
+  Opaque_RegisterUserSec *sec = (Opaque_RegisterUserSec *) _sec;
+  memcpy(&sec->pw, pw, pwlen);
+  sec->pwlen = pwlen;
+  return blind(pw, pwlen, sec->r, alpha);
 }
 
 // initUser: S
@@ -1164,8 +1173,8 @@ int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t
 // (4) finally generates: p_s ←_R Z_q, P_s := g^p_s;
 // called CreateRegistrationResponse in the ietf cfrg rfc draft
 int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]) {
-  Opaque_RegisterSec *sec = (Opaque_RegisterSec *) _sec;
-  Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
+  Opaque_RegisterSrvSec *sec = (Opaque_RegisterSrvSec *) _sec;
+  Opaque_RegisterSrvPub *pub = (Opaque_RegisterSrvPub *) _pub;
 
   // (a) Checks that α ∈ G^∗ . If not, outputs (abort, sid , ssid ) and halts;
   if(crypto_core_ristretto255_is_valid_point(alpha)!=1) return -1;
@@ -1203,8 +1212,7 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t _sec[OPAQUE_RE
 // (d) P_u := g^p_u,
 // (e) c ← AuthEnc_rw (p_u, P_u, P_s);
 // called FinalizeRequest in the ietf cfrg rfc draft
-int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
-                                    const uint8_t *r,
+int opaque_private_init_usr_respond(const uint8_t *_ctx,
                                     const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN],
                                     const uint8_t *key, const uint64_t key_len,        // contributes to the final rwd calculation as a key to the hash
                                     const Opaque_PkgConfig *cfg,
@@ -1212,7 +1220,8 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
                                     uint8_t _rec[OPAQUE_USER_RECORD_LEN],
                                     uint8_t export_key[crypto_hash_sha256_BYTES]) {
 
-  Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
+  Opaque_RegisterUserSec *ctx = (Opaque_RegisterUserSec *) _ctx;
+  Opaque_RegisterSrvPub *pub = (Opaque_RegisterSrvPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
 
   const uint16_t ClrEnv_len = package_len(cfg, ids, InClrEnv);
@@ -1230,7 +1239,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
   // invert r = 1/r
   uint8_t ir[crypto_core_ristretto255_SCALARBYTES];
   if(-1==sodium_mlock(ir, sizeof ir)) return -1;
-  if (crypto_core_ristretto255_scalar_invert(ir, r) != 0) {
+  if (crypto_core_ristretto255_scalar_invert(ir, ctx->r) != 0) {
     sodium_munlock(ir, sizeof ir);
     return -1;
   }
@@ -1264,7 +1273,7 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
     uint8_t domain[]=RFCREF;
     crypto_generichash_init(&state, domain, (sizeof domain) - 1, 32);
   }
-  crypto_generichash_update(&state, pw, pwlen);
+  crypto_generichash_update(&state, ctx->pw, ctx->pwlen);
   crypto_generichash_update(&state, h0, 32);
   sodium_munlock(h0, sizeof(h0));
 
@@ -1346,8 +1355,8 @@ int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen,
 // S records file[sid ] := {k_s, p_s, P_s, P_u, c}.
 // called StoreUserRecord in the ietf cfrg rfc draft
 void opaque_private_init_srv_finish(const uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN], uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
-  Opaque_RegisterSec *sec = (Opaque_RegisterSec *) _sec;
-  Opaque_RegisterPub *pub = (Opaque_RegisterPub *) _pub;
+  Opaque_RegisterSrvSec *sec = (Opaque_RegisterSrvSec *) _sec;
+  Opaque_RegisterSrvPub *pub = (Opaque_RegisterSrvPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
 
   memcpy(rec->k_s, sec->k_s, sizeof rec->k_s);

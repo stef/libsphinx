@@ -223,17 +223,17 @@ MunitResult private_init(const MunitParameter params[], void* user_data_or_fixtu
   Opaque_ServerAuthCTX ctx;
 
   uint8_t alpha[crypto_core_ristretto255_BYTES];
-  uint8_t r[crypto_core_ristretto255_SCALARBYTES];
+  uint8_t usr_ctx[OPAQUE_REGISTER_USER_SEC_LEN+pwlen];
   // user initiates:
   fprintf(stderr,"opaque_private_init_usr_start\n");
-  if(0!=opaque_private_init_usr_start(pw, pwlen, r, alpha)) return MUNIT_FAIL;
+  if(0!=opaque_private_init_usr_start(pw, pwlen, usr_ctx, alpha)) return 1;
   // server responds
   unsigned char rsec[OPAQUE_REGISTER_SECRET_LEN], rpub[OPAQUE_REGISTER_PUBLIC_LEN];
   fprintf(stderr,"opaque_private_init_srv_respond\n");
   if(0!=opaque_private_init_srv_respond(alpha, rsec, rpub)) return MUNIT_FAIL;
   // user commits its secrets
   fprintf(stderr,"opaque_private_init_usr_respond\n");
-  if(0!=opaque_private_init_usr_respond(pw, pwlen, r, rpub, key, key_len, cfg, &ids, rec, export_key)) return MUNIT_FAIL;
+  if(0!=opaque_private_init_usr_respond(usr_ctx, rpub, key, key_len, cfg, &ids, rec, export_key)) return MUNIT_FAIL;
   // server "saves"
   fprintf(stderr,"opaque_private_init_srv_finish\n");
   opaque_private_init_srv_finish(rsec, rpub, rec);

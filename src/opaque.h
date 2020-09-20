@@ -38,6 +38,9 @@
 #define OPAQUE_REGISTER_SECRET_LEN (/* p_s */ crypto_scalarmult_SCALARBYTES+ \
                                     /* k_s */ crypto_core_ristretto255_SCALARBYTES)
 
+#define OPAQUE_REGISTER_USER_SEC_LEN (/* r */ crypto_scalarmult_BYTES+ \
+                                      sizeof(size_t))
+
 typedef struct {
   uint16_t idU_len;
   uint8_t *idU;
@@ -152,7 +155,7 @@ int opaque_session_server_auth(Opaque_ServerAuthCTX *ctx, const uint8_t authU[cr
  * step 3 of this registration protocol and the value alpha should be
  * passed to the server.
  */
-int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t *r, uint8_t *alpha);
+int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t ctx[OPAQUE_REGISTER_USER_SEC_LEN+pwlen], uint8_t *alpha);
 
 /*
  * The server receives alpha from the users invocation of its
@@ -173,7 +176,7 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t sec[OPAQUE_REG
  * result of this is the value rec which should be passed for the last
  * step to the server.
  */
-int opaque_private_init_usr_respond(const uint8_t *pw, const size_t pwlen, const uint8_t *r, const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]);
+int opaque_private_init_usr_respond(const uint8_t *ctx, const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /*
  * The server combines the sec value from its run of its
