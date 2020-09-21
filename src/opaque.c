@@ -96,6 +96,20 @@ typedef struct {
   uint8_t ke3[32];
 } __attribute((packed)) Opaque_Keys;
 
+/**
+ * struct Opaque_ServerAuthCTX for storing context information for
+ * explicit authentication.
+ *
+ * In case the Opaque session requires explicit authentication of the
+ * user, the client needs to retain this information from the
+ * opaque_session_srv() to use during the authentication of the user
+ * via the opaque_session_server_auth() function.
+ */
+typedef struct {
+  uint8_t km3[crypto_auth_hmacsha256_KEYBYTES];
+  crypto_hash_sha256_state xcript_state;
+} Opaque_ServerAuthCTX;
+
 typedef enum {
   skU = 1,
   pkU = 2,
@@ -290,10 +304,13 @@ static void get_xcript(uint8_t xcript[crypto_hash_sha256_BYTES],
 
 //opaque_session_srv
 static void get_xcript_srv(uint8_t xcript[crypto_hash_sha256_BYTES],
-                           Opaque_ServerAuthCTX *ctx,
+                           uint8_t _ctx[OPAQUE_SERVER_AUTH_CTX_LEN],
                            const Opaque_UserSession *pub,
                            const Opaque_ServerSession *resp,
                            const Opaque_App_Infos *infos) {
+
+  Opaque_ServerAuthCTX *ctx = (Opaque_ServerAuthCTX *)_ctx;
+
   if(ctx!=NULL)
     get_xcript(xcript, &ctx->xcript_state, pub->alpha, pub->nonceU, pub->X_u, resp->beta, (uint8_t*) &resp->envelope, resp->env_len, resp->nonceS, resp->X_s, infos, 0);
   else
@@ -838,8 +855,9 @@ int opaque_session_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t _sec
 // (d) Computes K := KE(p_s, x_s, P_u, X_u) and SK := f K (0);
 // (e) Sends β, X s and c to U;
 // (f) Outputs (sid , ssid , SK).
-int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const uint8_t _rec[OPAQUE_USER_RECORD_LEN], const Opaque_Ids *ids, const Opaque_App_Infos *infos, uint8_t _resp[OPAQUE_SERVER_SESSION_LEN], uint8_t sk[crypto_secretbox_KEYBYTES],  Opaque_ServerAuthCTX *ctx) {
+int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const uint8_t _rec[OPAQUE_USER_RECORD_LEN], const Opaque_Ids *ids, const Opaque_App_Infos *infos, uint8_t _resp[OPAQUE_SERVER_SESSION_LEN], uint8_t sk[crypto_secretbox_KEYBYTES],  uint8_t _ctx[OPAQUE_SERVER_AUTH_CTX_LEN]) {
 
+  Opaque_ServerAuthCTX *ctx = (Opaque_ServerAuthCTX *)_ctx;
   Opaque_UserSession *pub = (Opaque_UserSession *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
   Opaque_ServerSession *resp = (Opaque_ServerSession *) _resp;
@@ -914,7 +932,7 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
 
   // Mac(Km2; xcript2) - from the ietf cfrg draft
   uint8_t xcript[crypto_hash_sha256_BYTES];
-  get_xcript_srv(xcript, ctx, pub, resp, infos);
+  get_xcript_srv(xcript, _ctx, pub, resp, infos);
   crypto_auth_hmacsha256(resp->auth,                          // out
                          xcript,                              // in
                          crypto_hash_sha256_BYTES,            // len(in)
@@ -1138,7 +1156,9 @@ int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
 }
 
 // extra function to implement the hmac based auth as defined in the ietf cfrg draft
-int opaque_session_server_auth(Opaque_ServerAuthCTX *ctx, const uint8_t authU[crypto_auth_hmacsha256_BYTES], const Opaque_App_Infos *infos) {
+int opaque_session_server_auth(uint8_t _ctx[OPAQUE_SERVER_AUTH_CTX_LEN], const uint8_t authU[crypto_auth_hmacsha256_BYTES], const Opaque_App_Infos *infos) {
+  Opaque_ServerAuthCTX *ctx = (Opaque_ServerAuthCTX *)_ctx;
+
   if(infos!=NULL) {
     if(infos->info3!=NULL) crypto_hash_sha256_update(&ctx->xcript_state, infos->info3, infos->info3_len);
     if(infos->einfo3!=NULL) crypto_hash_sha256_update(&ctx->xcript_state, infos->einfo3, infos->einfo3_len);

@@ -152,9 +152,9 @@ MunitResult server_init(const MunitParameter params[], void* user_data_or_fixtur
 
   unsigned char resp[OPAQUE_SERVER_SESSION_LEN+env_len];
   uint8_t sk[32];
-  Opaque_ServerAuthCTX ctx={0};
+  uint8_t ctx[OPAQUE_SERVER_AUTH_CTX_LEN]={0};
   fprintf(stderr,"opaque_session_srv()\n");
-  if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, &ctx)) return MUNIT_FAIL;
+  if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, ctx)) return MUNIT_FAIL;
 
   uint8_t pk[32];
   fprintf(stderr,"opaque_session_usr_finish()\n");
@@ -177,7 +177,7 @@ MunitResult server_init(const MunitParameter params[], void* user_data_or_fixtur
   assert(sodium_memcmp(export_key,export_key_x,sizeof export_key)==0);
 
   fprintf(stderr,"opaque_session_server_auth()\n");
-  if(-1==opaque_session_server_auth(&ctx, authU, NULL)) {
+  if(-1==opaque_session_server_auth(ctx, authU, NULL)) {
     fprintf(stderr,"failed authenticating user\n");
     return MUNIT_FAIL;
   }
@@ -220,7 +220,7 @@ MunitResult private_init(const MunitParameter params[], void* user_data_or_fixtu
     ids1.idS_len = ids.idS_len;
     memcpy(idS, ids.idS, ids.idS_len);
   }
-  Opaque_ServerAuthCTX ctx;
+  uint8_t ctx[OPAQUE_SERVER_AUTH_CTX_LEN]={0};
 
   uint8_t alpha[crypto_core_ristretto255_BYTES];
   uint8_t usr_ctx[OPAQUE_REGISTER_USER_SEC_LEN+pwlen];
@@ -241,13 +241,13 @@ MunitResult private_init(const MunitParameter params[], void* user_data_or_fixtu
   fprintf(stderr,"opaque_session_usr_start\n");
   opaque_session_usr_start(pw, pwlen, sec, pub);
   fprintf(stderr,"opaque_session_srv\n");
-  if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, &ctx)) return MUNIT_FAIL;
+  if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, ctx)) return MUNIT_FAIL;
   fprintf(stderr,"opaque_session_usr_finish\n");
   if(0!=opaque_session_usr_finish(resp, sec, key, key_len, cfg, NULL, &ids1, pk, authU, export_key)) return MUNIT_FAIL;
   assert(sodium_memcmp(sk,pk,sizeof sk)==0);
 
   // authenticate both parties:
-  if(-1==opaque_session_server_auth(&ctx, authU, NULL)) {
+  if(-1==opaque_session_server_auth(ctx, authU, NULL)) {
     fprintf(stderr,"failed authenticating user\n");
     return MUNIT_FAIL;
   }

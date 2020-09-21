@@ -63,9 +63,9 @@ int main(void) {
 
   unsigned char resp[OPAQUE_SERVER_SESSION_LEN+env_len];
   uint8_t sk[32];
-  Opaque_ServerAuthCTX ctx;
+  uint8_t ctx[OPAQUE_SERVER_AUTH_CTX_LEN];
   printf("opaque_session_srv()\n");
-  if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, &ctx)) return 1;
+  if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, ctx)) return 1;
 
   _dump(sk,32,"sk_s: ");
 
@@ -89,7 +89,7 @@ int main(void) {
   assert(sodium_memcmp(export_key,export_key_x,sizeof export_key)==0);
 
   printf("opaque_session_server_auth()\n");
-  if(-1==opaque_session_server_auth(&ctx, authU, NULL)) {
+  if(-1==opaque_session_server_auth(ctx, authU, NULL)) {
     printf("failed authenticating user\n");
     return 1;
   }
@@ -117,7 +117,7 @@ int main(void) {
   printf("opaque_session_usr_start\n");
   opaque_session_usr_start(pw, pwlen, sec, pub);
   printf("opaque_session_srv\n");
-  if(0!=opaque_session_srv(pub, rrec, &ids, NULL, resp, sk, &ctx)) return 1;
+  if(0!=opaque_session_srv(pub, rrec, &ids, NULL, resp, sk, ctx)) return 1;
   _dump(sk,32,"sk_s: ");
   printf("opaque_session_usr_finish\n");
   if(0!=opaque_session_usr_finish(resp, sec, key, key_len, &cfg, NULL, &ids1, pk, authU, export_key)) return 1;
@@ -126,7 +126,7 @@ int main(void) {
 
   // authenticate both parties:
 
-  if(-1==opaque_session_server_auth(&ctx, authU, NULL)) {
+  if(-1==opaque_session_server_auth(ctx, authU, NULL)) {
     printf("failed authenticating user\n");
     return 1;
   }
