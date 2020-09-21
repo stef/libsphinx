@@ -124,7 +124,7 @@ typedef struct {
   uint8_t data[1];
 } __attribute((packed)) CredentialExtension;
 
-static int oprf(const uint8_t *pwd, const size_t pwd_len,
+static int prf(const uint8_t *pwd, const size_t pwd_len,
                 const uint8_t k[crypto_core_ristretto255_SCALARBYTES],
                 const uint8_t *key, const size_t key_len,
                 uint8_t rwd[crypto_generichash_BYTES]) {
@@ -719,7 +719,7 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
   // rw := F_k_s (pw),
   uint8_t rw0[32];
   if(-1==sodium_mlock(rw0,sizeof rw0)) return -1;
-  if(oprf(pw, pwlen, rec->k_s, key, key_len, rw0)!=0) {
+  if(prf(pw, pwlen, rec->k_s, key, key_len, rw0)!=0) {
     sodium_munlock(rw0,sizeof rw0);
     return -1;
   }
