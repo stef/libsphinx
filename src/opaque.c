@@ -576,7 +576,7 @@ static int opaque_envelope_open(const uint8_t *rwd, const uint8_t *envelope, con
 }
 
 // helper to calculate size of *Env parts of envelopes
-size_t package_len(const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, Opaque_PkgTarget type) {
+size_t package_len(const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, const Opaque_PkgTarget type) {
   size_t res=0;
   if(type==InSecEnv) res+=crypto_scalarmult_SCALARBYTES+3; // sku always in secenv
   if(cfg->pkU==type) res+=crypto_scalarmult_BYTES+3;
@@ -943,7 +943,7 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
 #endif
 
   memcpy(sk,keys.sk,sizeof(keys.sk));
-  memcpy(ctx->km3,keys.km3,sizeof(keys.km3));
+  if(ctx!=NULL) memcpy(ctx->km3,keys.km3,sizeof(keys.km3));
   sodium_munlock(&keys,sizeof(keys));
 
 #ifdef TRACE
@@ -1157,6 +1157,7 @@ int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
 
 // extra function to implement the hmac based auth as defined in the ietf cfrg draft
 int opaque_session_server_auth(uint8_t _ctx[OPAQUE_SERVER_AUTH_CTX_LEN], const uint8_t authU[crypto_auth_hmacsha256_BYTES], const Opaque_App_Infos *infos) {
+  if(_ctx==NULL) return 1;
   Opaque_ServerAuthCTX *ctx = (Opaque_ServerAuthCTX *)_ctx;
 
   if(infos!=NULL) {
