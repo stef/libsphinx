@@ -23,29 +23,33 @@
 #include "../opaque.h"
 #include "../common.h"
 
+static char* type_params[] = {
+  "\x00",
+  "\x01",
+  "\x02",
+  "\x03",
+  NULL
+};
+
 static char* pw_params[] = {
   "simple guessable dictionary password",
-  "1",
   "",
   NULL
 };
 
 static char* key_params[] = {
   "some optional key contributed to the opaque protocol",
-  "1",
   "",
   NULL
 };
 
 static char* idU_params[] = {
-  "xxxxxxxxxxxxxxxxxxxxxxxx",
   "user",
   "",
   NULL
 };
 
 static char* idS_params[] = {
-  "xxxxxxxxxxxxxxxxxxxxxxxx",
   "server",
   "",
   NULL
@@ -53,6 +57,7 @@ static char* idS_params[] = {
 
 static char* cfg_params[]=
   {"\x04",
+   "\xaa",
    "\x44",
    "\x84",
    "\x14",
@@ -105,7 +110,6 @@ static char* cfg_params[]=
    "\x9a",
    "\x2a",
    "\x6a",
-   "\xaa",
    NULL
 };
 
@@ -115,17 +119,26 @@ static MunitParameterEnum init_params[] = {
   { "idU", idU_params },
   { "idS", idS_params },
   { "cfg", cfg_params },
+  { "type", type_params },
   { NULL, NULL },
 };
 
-MunitResult server_init(const MunitParameter params[], void* user_data_or_fixture) {
+typedef enum {
+              ServerInit,
+              Server1kInit,
+              PrivateInit,
+              Private1kInit
+} TestType;
+
+MunitResult opaque_test(const MunitParameter params[], void* user_data_or_fixture) {
+  // variant where user registration does not leak secrets to server
   (void)user_data_or_fixture;
-  const uint8_t *pw=(const uint8_t*) munit_parameters_get(params, "pw"); //"simple guessable dictionary password";
+  const TestType type = *((const TestType*)munit_parameters_get(params, "type"));
+  const uint8_t *pw=(const uint8_t*) munit_parameters_get(params, "pw");
   const size_t pwlen=strlen((char*) pw);
   const uint8_t *key=(const uint8_t*) munit_parameters_get(params, "key");;
   size_t key_len=strlen((char*) key);
   uint8_t export_key[crypto_hash_sha256_BYTES];
-  uint8_t export_key_x[crypto_hash_sha256_BYTES];
 
   Opaque_Ids ids={0, (uint8_t*) munit_parameters_get(params, "idU"),
                   0, (uint8_t*) munit_parameters_get(params, "idS")};
@@ -141,68 +154,6 @@ MunitResult server_init(const MunitParameter params[], void* user_data_or_fixtur
   unsigned char rec[OPAQUE_USER_RECORD_LEN+env_len];
   fprintf(stderr,"sizeof(rec): %ld\n",sizeof(rec));
 
-  // register user
-  fprintf(stderr,"opaque_init_srv()\n");
-  if(0!=opaque_init_srv(pw, pwlen, key, key_len, cfg, &ids, rec, export_key)) return MUNIT_FAIL;
-
-  // initiate login
-  unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN+pwlen], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
-  fprintf(stderr,"opaque_session_usr_start()\n");
-  opaque_session_usr_start(pw, pwlen, sec, pub);
-
-  unsigned char resp[OPAQUE_SERVER_SESSION_LEN+env_len];
-  uint8_t sk[32];
-  uint8_t ctx[OPAQUE_SERVER_AUTH_CTX_LEN]={0};
-  fprintf(stderr,"opaque_session_srv()\n");
-  if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, ctx)) return MUNIT_FAIL;
-
-  uint8_t pk[32];
-  fprintf(stderr,"opaque_session_usr_finish()\n");
-  uint8_t authU[crypto_auth_hmacsha256_BYTES];
-  uint8_t idU[ids.idU_len], idS[ids.idS_len]; // must be big enough to fit ids
-  Opaque_Ids ids1={sizeof idU,idU,sizeof idS,idS};
-  // in case we omit the id* in the envelope we must provide it before-hand.
-  // if it is in the envelope it will be populated from the envelope
-  if(cfg->idU == NotPackaged) {
-    ids1.idU_len = ids.idU_len;
-    memcpy(idU, ids.idU, ids.idU_len);
-  }
-  if(cfg->idS == NotPackaged) {
-    ids1.idS_len = ids.idS_len;
-    memcpy(idS, ids.idS, ids.idS_len);
-  }
-  //Opaque_App_Infos infos;
-  if(0!=opaque_session_usr_finish(resp, sec, key, key_len, cfg, NULL, &ids1, pk, authU, export_key_x)) return MUNIT_FAIL;
-  assert(sodium_memcmp(sk,pk,sizeof sk)==0);
-  assert(sodium_memcmp(export_key,export_key_x,sizeof export_key)==0);
-
-  fprintf(stderr,"opaque_session_server_auth()\n");
-  if(-1==opaque_session_server_auth(ctx, authU, NULL)) {
-    fprintf(stderr,"failed authenticating user\n");
-    return MUNIT_FAIL;
-  }
-  return MUNIT_OK;
-}
-
-MunitResult private_init(const MunitParameter params[], void* user_data_or_fixture) {
-  // variant where user registration does not leak secrets to server
-  (void)user_data_or_fixture;
-  const uint8_t *pw=(const uint8_t*) munit_parameters_get(params, "pw"); //"simple guessable dictionary password";
-  size_t pwlen=strlen((char*) pw);
-  const uint8_t *key=(const uint8_t*) munit_parameters_get(params, "key");;
-  size_t key_len=strlen((char*) key);
-  uint8_t export_key[crypto_hash_sha256_BYTES];
-  Opaque_Ids ids={0,
-                  (uint8_t*) munit_parameters_get(params, "idU"),
-                  0,
-                  (uint8_t*) munit_parameters_get(params, "idS")};
-  ids.idU_len = strlen((char*)ids.idU);
-  ids.idS_len = strlen((char*)ids.idS);
-  Opaque_PkgConfig *cfg=(Opaque_PkgConfig *) munit_parameters_get(params, "cfg");
-  const uint16_t ClrEnv_len = package_len(cfg, &ids, InClrEnv);
-  const uint16_t SecEnv_len = package_len(cfg, &ids, InSecEnv);
-  const uint32_t env_len = OPAQUE_ENVELOPE_META_LEN + SecEnv_len + ClrEnv_len;
-  unsigned char rec[OPAQUE_USER_RECORD_LEN+env_len];
   unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN+pwlen], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
   unsigned char resp[OPAQUE_SERVER_SESSION_LEN+env_len];
   uint8_t sk[32];
@@ -224,19 +175,48 @@ MunitResult private_init(const MunitParameter params[], void* user_data_or_fixtu
 
   uint8_t alpha[crypto_core_ristretto255_BYTES];
   uint8_t usr_ctx[OPAQUE_REGISTER_USER_SEC_LEN+pwlen];
-  // user initiates:
-  fprintf(stderr,"opaque_private_init_usr_start\n");
-  if(0!=opaque_private_init_usr_start(pw, pwlen, usr_ctx, alpha)) return 1;
-  // server responds
-  unsigned char rsec[OPAQUE_REGISTER_SECRET_LEN], rpub[OPAQUE_REGISTER_PUBLIC_LEN];
-  fprintf(stderr,"opaque_private_init_srv_respond\n");
-  if(0!=opaque_private_init_srv_respond(alpha, rsec, rpub)) return MUNIT_FAIL;
-  // user commits its secrets
-  fprintf(stderr,"opaque_private_init_usr_respond\n");
-  if(0!=opaque_private_init_usr_respond(usr_ctx, rpub, key, key_len, cfg, &ids, rec, export_key)) return MUNIT_FAIL;
-  // server "saves"
-  fprintf(stderr,"opaque_private_init_srv_finish\n");
-  opaque_private_init_srv_finish(rsec, rpub, rec);
+
+  uint8_t _skS[crypto_scalarmult_SCALARBYTES], _pkS[crypto_scalarmult_BYTES];
+  uint8_t *skS, *pkS;
+  if(type==Private1kInit || type==Server1kInit) {
+    skS=_skS;
+    pkS=_pkS;
+    randombytes(skS, crypto_scalarmult_SCALARBYTES);
+    crypto_scalarmult_base(pkS, skS);
+  } else {
+    skS=NULL;
+    pkS=NULL;
+  }
+
+  if(type==ServerInit || type==Server1kInit) {
+    // register user
+    fprintf(stderr,"opaque_init_srv()\n");
+    if(0!=opaque_init_srv(pw, pwlen, key, key_len, skS, cfg, &ids, rec, export_key)) return MUNIT_FAIL;
+  } else {
+    // user initiates:
+    fprintf(stderr,"opaque_private_init_usr_start\n");
+    if(0!=opaque_private_init_usr_start(pw, pwlen, usr_ctx, alpha)) return 1;
+    // server responds
+    unsigned char rsec[OPAQUE_REGISTER_SECRET_LEN], rpub[OPAQUE_REGISTER_PUBLIC_LEN];
+    if(type==Private1kInit) {
+      fprintf(stderr,"opaque_private_init_1ksrv_respond\n");
+      if(0!=opaque_private_init_1ksrv_respond(alpha, pkS, rsec, rpub)) return MUNIT_FAIL;
+    } else {
+      fprintf(stderr,"opaque_private_init_srv_respond\n");
+      if(0!=opaque_private_init_srv_respond(alpha, rsec, rpub)) return MUNIT_FAIL;
+    }
+    // user commits its secrets
+    fprintf(stderr,"opaque_private_init_usr_respond\n");
+    if(0!=opaque_private_init_usr_respond(usr_ctx, rpub, key, key_len, cfg, &ids, rec, export_key)) return MUNIT_FAIL;
+    // server "saves"
+    if(type==Private1kInit) {
+      fprintf(stderr,"opaque_private_init_1ksrv_finish\n");
+      opaque_private_init_1ksrv_finish(rsec, skS, rec);
+    } else {
+      fprintf(stderr,"opaque_private_init_srv_finish\n");
+      opaque_private_init_srv_finish(rsec, rec);
+    }
+  }
 
   fprintf(stderr,"opaque_session_usr_start\n");
   opaque_session_usr_start(pw, pwlen, sec, pub);
@@ -259,14 +239,7 @@ MunitResult private_init(const MunitParameter params[], void* user_data_or_fixtu
 
 MunitTest tests[] = {
   { "/server-init", /* name */
-    server_init, /* test */
-    NULL, /* setup */
-    NULL, /* tear_down */
-    MUNIT_TEST_OPTION_NONE, /* options */
-    init_params /* parameters */
-  },
-  { "/private-init", /* name */
-    private_init, /* test */
+    opaque_test, /* test */
     NULL, /* setup */
     NULL, /* tear_down */
     MUNIT_TEST_OPTION_NONE, /* options */
@@ -277,6 +250,7 @@ MunitTest tests[] = {
   { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 
+
 static const MunitSuite suite = {
   "/opaque-tests",
   tests, /* tests */
@@ -286,5 +260,10 @@ static const MunitSuite suite = {
 };
 
 int main (int argc, char* const argv[]) {
-   return munit_suite_main(&suite, NULL, argc, argv);
+  if(argc>1 && memcmp(argv[1],"full",5)==0) {
+    return munit_suite_main(&suite, NULL, argc, argv);
+  } else {
+    cfg_params[2]=NULL;
+    return munit_suite_main(&suite, NULL, argc, argv);
+  }
 }

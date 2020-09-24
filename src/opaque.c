@@ -329,7 +329,7 @@ static void get_xcript_usr(uint8_t xcript[crypto_hash_sha256_BYTES],
 
 
 // implements server end of triple-dh
-static int opaque_server_3dh(Opaque_Keys *keys,
+static int server_3dh(Opaque_Keys *keys,
                const uint8_t ix[crypto_scalarmult_SCALARBYTES],
                const uint8_t ex[crypto_scalarmult_SCALARBYTES],
                const uint8_t Ip[crypto_scalarmult_BYTES],
@@ -357,7 +357,7 @@ static int opaque_server_3dh(Opaque_Keys *keys,
 }
 
 // implements user end of triple-dh
-static int opaque_user_3dh(Opaque_Keys *keys,
+static int user_3dh(Opaque_Keys *keys,
              const uint8_t ix[crypto_scalarmult_SCALARBYTES],
              const uint8_t ex[crypto_scalarmult_SCALARBYTES],
              const uint8_t Ip[crypto_scalarmult_BYTES],
@@ -699,6 +699,7 @@ static int unpack(const Opaque_PkgConfig *cfg, const uint8_t *SecEnv, const uint
 // it records file[sid] := {k_s, p_s, P_s, P_u, c}.
 int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
                     const uint8_t *key, const uint64_t key_len,
+                    const uint8_t sk[crypto_scalarmult_SCALARBYTES],
                     const Opaque_PkgConfig *cfg,
                     const Opaque_Ids *ids,
                     uint8_t _rec[OPAQUE_USER_RECORD_LEN],
@@ -750,7 +751,11 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
   dump(_rec, OPAQUE_USER_RECORD_LEN+env_len, "k_s\nplain user rec ");
 #endif
   // p_s ←_R Z_q
-  randombytes(rec->p_s, crypto_scalarmult_SCALARBYTES); // random server secret key
+  if(sk==NULL) {
+    randombytes(rec->p_s, crypto_scalarmult_SCALARBYTES); // random server secret key
+  } else {
+    memcpy(rec->p_s, sk, crypto_scalarmult_SCALARBYTES);
+  }
 
 #ifdef TRACE
   dump(_rec, OPAQUE_USER_RECORD_LEN+env_len, "p_s\nplain user rec ");
@@ -915,7 +920,7 @@ int opaque_session_srv(const uint8_t _pub[OPAQUE_USER_SESSION_PUBLIC_LEN], const
   dump(rec->P_u,crypto_scalarmult_BYTES, "rec->P_u ");
   dump(pub->X_u,crypto_scalarmult_BYTES, "pub->X_u ");
 #endif
-  if(0!=opaque_server_3dh(&keys, rec->p_s, x_s, rec->P_u, pub->X_u, info)) {
+  if(0!=server_3dh(&keys, rec->p_s, x_s, rec->P_u, pub->X_u, info)) {
     sodium_munlock(x_s, sizeof(x_s));
     sodium_munlock(&keys,sizeof(keys));
     return -1;
@@ -1113,7 +1118,7 @@ int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
   dump(cred.P_s,crypto_scalarmult_BYTES, "c->P_s ");
   dump(resp->X_s,crypto_scalarmult_BYTES, "sec->X_s ");
 #endif
-  if(0!=opaque_user_3dh(&keys, cred.p_u, sec->x_u, cred.P_s, resp->X_s, info)) {
+  if(0!=user_3dh(&keys, cred.p_u, sec->x_u, cred.P_s, resp->X_s, info)) {
     sodium_munlock(&keys, sizeof(keys));
     sodium_munlock(&cred, sizeof cred);
     return -1;
@@ -1219,6 +1224,39 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t _sec[OPAQUE_RE
 
   // P_s := g^p_s
   crypto_scalarmult_base(pub->P_s, sec->p_s);
+#ifdef TRACE
+  dump((uint8_t*) pub->P_s, sizeof pub->P_s, "P_s ");
+#endif
+
+  return 0;
+}
+
+// same function as opaque_private_init_srv_respond() but does not generate a long-term server keypair
+// initUser: S
+// (1) checks α ∈ G^∗ If not, outputs (abort, sid , ssid ) and halts;
+// (2) generates k_s ←_R Z_q,
+// (3) computes: β := α^k_s,
+// (4) finally generates: p_s ←_R Z_q, P_s := g^p_s;
+// called CreateRegistrationResponse in the ietf cfrg rfc draft
+int opaque_private_init_1ksrv_respond(const uint8_t *alpha, const uint8_t pk[crypto_scalarmult_BYTES], uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]) {
+  Opaque_RegisterSrvSec *sec = (Opaque_RegisterSrvSec *) _sec;
+  Opaque_RegisterSrvPub *pub = (Opaque_RegisterSrvPub *) _pub;
+
+  // (a) Checks that α ∈ G^∗ . If not, outputs (abort, sid , ssid ) and halts;
+  if(crypto_core_ristretto255_is_valid_point(alpha)!=1) return -1;
+
+  // k_s ←_R Z_q
+  crypto_core_ristretto255_scalar_random(sec->k_s);
+
+  // computes β := α^k_s
+  if (crypto_scalarmult_ristretto255(pub->beta, sec->k_s, alpha) != 0) {
+    return -1;
+  }
+#ifdef TRACE
+  dump((uint8_t*) pub->beta, sizeof pub->beta, "beta ");
+#endif
+
+  memcpy(pub->P_s, pk, crypto_scalarmult_BYTES);
 #ifdef TRACE
   dump((uint8_t*) pub->P_s, sizeof pub->P_s, "P_s ");
 #endif
@@ -1375,14 +1413,25 @@ int opaque_private_init_usr_respond(const uint8_t *_ctx,
 
 // S records file[sid ] := {k_s, p_s, P_s, P_u, c}.
 // called StoreUserRecord in the ietf cfrg rfc draft
-void opaque_private_init_srv_finish(const uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN], uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
+void opaque_private_init_srv_finish(const uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
   Opaque_RegisterSrvSec *sec = (Opaque_RegisterSrvSec *) _sec;
-  Opaque_RegisterSrvPub *pub = (Opaque_RegisterSrvPub *) _pub;
   Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
 
   memcpy(rec->k_s, sec->k_s, sizeof rec->k_s);
   memcpy(rec->p_s, sec->p_s, sizeof rec->p_s);
-  memcpy(rec->P_s, pub->P_s, sizeof rec->P_s);
+  crypto_scalarmult_base(rec->P_s, rec->p_s);
+#ifdef TRACE
+  dump((uint8_t*) rec, OPAQUE_USER_RECORD_LEN, "user rec ");
+#endif
+}
+
+void opaque_private_init_1ksrv_finish(const uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t sk[crypto_scalarmult_SCALARBYTES], uint8_t _rec[OPAQUE_USER_RECORD_LEN]) {
+  Opaque_RegisterSrvSec *sec = (Opaque_RegisterSrvSec *) _sec;
+  Opaque_UserRecord *rec = (Opaque_UserRecord *) _rec;
+
+  memcpy(rec->k_s, sec->k_s, sizeof rec->k_s);
+  memcpy(rec->p_s, sk, crypto_scalarmult_SCALARBYTES);
+  crypto_scalarmult_base(rec->P_s, sk);
 #ifdef TRACE
   dump((uint8_t*) rec, OPAQUE_USER_RECORD_LEN, "user rec ");
 #endif

@@ -128,6 +128,9 @@ typedef struct {
         "RFCXXXX" - TODO set XXXX to the real value when the rfc is
         published.
    @param [in] key_len - length of the key, ignored if key is NULL
+   @param [in] sk - in case of global server keys this is the servers
+        private key, should be set to NULL if per/user keys are to be
+        generated
    @param [in] cfg - configuration of the opaque envelope, see
         Opaque_PkgConfig
    @param [in] ids - the ids of the user and server, see Opaque_Ids
@@ -141,7 +144,7 @@ typedef struct {
         encrypt/authenticate additional data.
    @return the function returns 0 if everything is correct
  */
-int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const uint8_t *key, const uint64_t key_len, const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]);
+int opaque_init_srv(const uint8_t *pw, const size_t pwlen, const uint8_t *key, const uint64_t key_len, const uint8_t sk[crypto_scalarmult_SCALARBYTES], const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, uint8_t rec[OPAQUE_USER_RECORD_LEN], uint8_t export_key[crypto_hash_sha256_BYTES]);
 
 /**
    This function initiates a new OPAQUE session, is the same as the
@@ -264,7 +267,7 @@ int opaque_session_server_auth(uint8_t _ctx[OPAQUE_SERVER_AUTH_CTX_LEN], const u
 int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t ctx[OPAQUE_REGISTER_USER_SEC_LEN+pwlen], uint8_t *alpha);
 
 /**
-   Servers evaluates OPRF and creates a user-specific public/private keypair
+   Server evaluates OPRF and creates a user-specific public/private keypair
 
    This function is called CreateRegistrationResponse in the rfc.
    The server receives alpha from the users invocation of its
@@ -279,6 +282,29 @@ int opaque_private_init_usr_start(const uint8_t *pw, const size_t pwlen, uint8_t
    @return the function returns 0 if everything is correct.
  */
 int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN]);
+
+/**
+   2nd step of registration: Server evaluates OPRF - Global Server Key Version
+
+   This function is essentially the same as
+   opaque_private_init_srv_respond(), except it does not generate a
+   per-user long-term key, but instead expects the servers long-term
+   pubkey as a parameter.
+
+   This function is called CreateRegistrationResponse in the rfc.
+   The server receives alpha from the users invocation of its
+   opaque_private_init_usr_start() function, it outputs a value sec
+   which needs to be protected until step 4 by the server. This
+   function also outputs a value pub which needs to be passed to the
+   user.
+   @param [in] alpha - the blinded password as per the OPRF.
+   @param [in] pk - the servers long-term pubkey
+   @param [out] sec - the private key and the OPRF secret of the server.
+   @param [out] pub - the evaluated OPRF and pubkey of the server to
+   be passed to the client into opaque_private_init_usr_respond()
+   @return the function returns 0 if everything is correct.
+ */
+int opaque_private_init_1ksrv_respond(const uint8_t *alpha, const uint8_t pk[crypto_scalarmult_BYTES], uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t _pub[OPAQUE_REGISTER_PUBLIC_LEN]);
 
 /**
    Client finalizes registration by concluding the OPRF, generating
@@ -331,17 +357,43 @@ int opaque_private_init_usr_respond(const uint8_t *ctx, const uint8_t pub[OPAQUE
    @param [in] sec - the private value of the server running
    opaque_private_init_srv_respond() in step 2 of the registration
    protocol
-   @param [in] pub - the clients response generated in the 3rd step of
-   the registration protocol in opaque_private_init_usr_respond()
-   (called rec there)
-   @param [out] rec - the final record to be stored by the server
-   this is a pointer to memory allocated by the caller, and must be
-   large enough to hold the record and take into account the variable
-   length of idU and idS in case these are included in the envelope.
-
-   @return the function returns 0 if everything is correct.
+   @param [in/out] rec - input the record from the client running
+   opaque_private_init_usr_respond() - output the final record to be
+   stored by the server this is a pointer to memory allocated by the
+   caller, and must be large enough to hold the record and take into
+   account the variable length of idU and idS in case these are
+   included in the envelope.
  */
-void opaque_private_init_srv_finish(const uint8_t sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t pub[OPAQUE_REGISTER_PUBLIC_LEN], uint8_t rec[OPAQUE_USER_RECORD_LEN]);
+void opaque_private_init_srv_finish(const uint8_t sec[OPAQUE_REGISTER_SECRET_LEN], uint8_t rec[OPAQUE_USER_RECORD_LEN]);
+
+/**
+   Final Registration step Global Server Key Version - server adds own info to the record to be stored.
+
+   this function essentially does the same as
+   opaque_private_init_srv_finish() except that it needs the global
+   serve secret key as a parameter.
+
+   The rfc does not explicitly specify this function.
+   The server combines the sec value from its run of its
+   opaque_private_init_srv_respond() function with the rec output of
+   the users opaque_private_init_usr_respond() function, creating the
+   final record, which should be the same as the output of the 1-step
+   storePwdFile() init function of the paper. The server should save
+   this record in combination with a user id and/or sid value as
+   suggested in the paper.
+
+   @param [in] sec - the private value of the server running
+   opaque_private_init_srv_respond() in step 2 of the registration
+   protocol
+   @param [in] sk - the servers long-term private key
+   @param [in/out] rec - input the record from the client running
+   opaque_private_init_usr_respond() - output the final record to be
+   stored by the server this is a pointer to memory allocated by the
+   caller, and must be large enough to hold the record and take into
+   account the variable length of idU and idS in case these are
+   included in the envelope.
+ */
+void opaque_private_init_1ksrv_finish(const uint8_t _sec[OPAQUE_REGISTER_SECRET_LEN], const uint8_t sk[crypto_scalarmult_SCALARBYTES], uint8_t _rec[OPAQUE_USER_RECORD_LEN]);
 
 /**
    helper function calculating the length of the two parts of the envelope

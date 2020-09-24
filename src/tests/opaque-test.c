@@ -54,7 +54,7 @@ int main(void) {
 
   // register user
   printf("opaque_init_srv()\n");
-  if(0!=opaque_init_srv(pw, pwlen, key, key_len, &cfg, &ids, rec, export_key)) return 1;
+  if(0!=opaque_init_srv(pw, pwlen, key, key_len, NULL, &cfg, &ids, rec, export_key)) return 1;
 
   // initiate login
   unsigned char sec[OPAQUE_USER_SESSION_SECRET_LEN+pwlen], pub[OPAQUE_USER_SESSION_PUBLIC_LEN];
@@ -112,7 +112,7 @@ int main(void) {
   if(0!=opaque_private_init_usr_respond(usr_ctx, rpub, key, key_len, &cfg, &ids, rrec, export_key)) return 1;
   // server "saves"
   printf("opaque_private_init_srv_finish\n");
-  opaque_private_init_srv_finish(rsec, rpub, rrec);
+  opaque_private_init_srv_finish(rsec, rrec);
 
   printf("opaque_session_usr_start\n");
   opaque_session_usr_start(pw, pwlen, sec, pub);
