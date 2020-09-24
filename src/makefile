@@ -53,8 +53,8 @@ tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 tests/opaque$(EXT): tests/opaque-test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/opaque$(EXT) tests/opaque-test.c -L. -lsphinx $(LDFLAGS)
 
-tests/opaque-munit$(EXT): tests/opaque_munit.c libsphinx.$(SOEXT) 
-	$(CC) $(CFLAGS) -o tests/munit-opaque$(EXT) tests/munit/munit.c tests/opaque_munit.c -lsphinx $(LDFLAGS)
+tests/opaque-munit$(EXT): tests/opaque_munit.c libsphinx.$(SOEXT)
+	$(CC) $(CFLAGS) -o tests/munit-opaque$(EXT) tests/munit/munit.c tests/opaque_munit.c -L. -lsphinx $(LDFLAGS)
 
 test: tests/opaque-munit$(EXT)
 	LD_PRELOAD=./libsphinx.so ./tests/munit-opaque --fatal-failures
