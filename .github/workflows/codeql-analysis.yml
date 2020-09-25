@@ -51,7 +51,7 @@ jobs:
        git submodule update --init --recursive munit
        sudo apt-get update
        sudo apt-get install python libsodium-dev pkgconf
-       make
+       make bin libsphinx.so tests/sphinx tests/opaque
      
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
