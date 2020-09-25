@@ -48,6 +48,7 @@ jobs:
 
     - run: |
        cd src
+       git submodule update --init --recursive munit
        sudo apt-get update
        sudo apt-get install python libsodium-dev pkgconf
        make
