@@ -36,7 +36,7 @@
    /* beta */ crypto_core_ristretto255_BYTES+          \
    /* X_s */ crypto_scalarmult_BYTES+                  \
    /* nonceS */ OPAQUE_NONCE_BYTES+                    \
-     /* auth */ crypto_auth_hmacsha256_BYTES+          \
+   /* auth */ crypto_auth_hmacsha256_BYTES+            \
    /* env_len */ sizeof(uint32_t))
 
 #define OPAQUE_REGISTER_PUBLIC_LEN (                   \
@@ -53,7 +53,7 @@
 
 #define OPAQUE_SERVER_AUTH_CTX_LEN ( \
   crypto_auth_hmacsha256_KEYBYTES +  \
-  sizeof(crypto_hash_sha256_state)   )
+  sizeof(crypto_hash_sha256_state))
 
 /**
    struct to store the IDs of the user/server.
