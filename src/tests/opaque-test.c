@@ -40,12 +40,14 @@ int main(void) {
   ids.idU_len = strlen((char*) ids.idU);
   ids.idS_len = strlen((char*) ids.idS);
   Opaque_PkgConfig cfg={
+                        .skU = NotPackaged,
                         .pkU = NotPackaged,
-                        .pkS = InClrEnv,
+                        .pkS = InSecEnv,
                         .idS = NotPackaged,
                         .idU = NotPackaged,
   };
   _dump((uint8_t*) &cfg,sizeof cfg, "cfg ");
+  fprintf(stderr, "cfg sku: %d, pku:%d, pks:%d, idu:%d, ids:%d\n", cfg.skU, cfg.pkU, cfg.pkS, cfg.idU, cfg.idS);
   const uint16_t ClrEnv_len = package_len(&cfg, &ids, InClrEnv);
   const uint16_t SecEnv_len = package_len(&cfg, &ids, InSecEnv);
   const uint32_t env_len = OPAQUE_ENVELOPE_META_LEN + SecEnv_len + ClrEnv_len;
@@ -63,7 +65,7 @@ int main(void) {
 
   unsigned char resp[OPAQUE_SERVER_SESSION_LEN+env_len];
   uint8_t sk[32];
-  uint8_t ctx[OPAQUE_SERVER_AUTH_CTX_LEN];
+  uint8_t ctx[OPAQUE_SERVER_AUTH_CTX_LEN]={0};
   printf("opaque_session_srv()\n");
   if(0!=opaque_session_srv(pub, rec, &ids, NULL, resp, sk, ctx)) return 1;
 
