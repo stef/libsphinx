@@ -578,7 +578,7 @@ static int opaque_envelope_open(const uint8_t *rwd, const uint8_t *envelope, con
 // helper to calculate size of *Env parts of envelopes
 size_t package_len(const Opaque_PkgConfig *cfg, const Opaque_Ids *ids, const Opaque_PkgTarget type) {
   size_t res=0;
-  if(type==InSecEnv) res+=crypto_scalarmult_SCALARBYTES+3; // sku always in secenv
+  if(cfg->skU==type) res+=crypto_scalarmult_SCALARBYTES+3;
   if(cfg->pkU==type) res+=crypto_scalarmult_BYTES+3;
   if(cfg->pkS==type) res+=crypto_scalarmult_BYTES+3;
   if(cfg->idU==type) res+=ids->idU_len+3;
@@ -608,7 +608,7 @@ static int extend_package(const uint8_t *src, const size_t src_len, const Opaque
 // takes skU, pkU, pkS, idU, idS and puts them into SecEnv or ClrEnv according to configuration
 static int pack(const Opaque_PkgConfig *cfg, const Opaque_Credentials *cred, const Opaque_Ids *ids, uint8_t *SecEnv, uint8_t *ClrEnv) {
   uint8_t *senv = SecEnv, *cenv = ClrEnv;
-  if(0!=extend_package(cred->p_u, crypto_scalarmult_SCALARBYTES, InSecEnv, skU, &senv, &cenv)) return 1;
+  if(cfg->skU==InClrEnv || 0!=extend_package(cred->p_u, crypto_scalarmult_SCALARBYTES, cfg->skU, skU, &senv, &cenv)) return 1;
   if(0!=extend_package(cred->P_u, crypto_scalarmult_BYTES, cfg->pkU, pkU, &senv, &cenv)) return 1;
   if(0!=extend_package(cred->P_s, crypto_scalarmult_BYTES, cfg->pkS, pkS, &senv, &cenv)) return 1;
   if(0!=extend_package(ids->idU, ids->idU_len, cfg->idU, idU, &senv, &cenv)) return 1;
@@ -619,7 +619,6 @@ static int pack(const Opaque_PkgConfig *cfg, const Opaque_Credentials *cred, con
 static int extract_credential(const Opaque_PkgConfig *cfg, const Opaque_PkgTarget current_target, const CredentialExtension *cred, uint8_t *seen, Opaque_Credentials *creds, Opaque_Ids *ids) {
   // only allow each type to be seen once
   if(*seen & (1 << (cred->type - 1))) return 1;
-  *seen|=(1 << (cred->type - 1));
 
   // validate that the cred is in the correct part of the envelope
   switch(cred->type) {
@@ -657,10 +656,13 @@ static int extract_credential(const Opaque_PkgConfig *cfg, const Opaque_PkgTarge
   };
   default: return 1;
   }
+
+  *seen|=(1 << (cred->type - 1));
+
   return 0;
 }
 
-static int unpack(const Opaque_PkgConfig *cfg, const uint8_t *SecEnv, const uint16_t SecEnv_len, const uint8_t *ClrEnv, const uint16_t ClrEnv_len, Opaque_Credentials *creds, Opaque_Ids *ids) {
+static int unpack(const Opaque_PkgConfig *cfg, const uint8_t *SecEnv, const uint16_t SecEnv_len, const uint8_t *ClrEnv, const uint16_t ClrEnv_len, const uint8_t *rwd, Opaque_Credentials *creds, Opaque_Ids *ids) {
   const uint8_t *ptr;
   uint8_t seen=0;
   const CredentialExtension* cred;
@@ -678,6 +680,16 @@ static int unpack(const Opaque_PkgConfig *cfg, const uint8_t *SecEnv, const uint
     cred = (const CredentialExtension*) ptr;
     extract_credential(cfg, InClrEnv, cred, &seen, creds, ids);
   }
+  // skU might not be packaged according to the rfc draft. In this case
+  // rwd is used to derive a seed for the keygen - which for 25519 is
+  // a null op and we use directly the seed as the secret key
+  // HKDF-Expand(KdKey; info="KG seed", L)
+  if(cfg->skU == NotPackaged) {
+    if(seen & (1 << (skU-1))) return 1; // skU was packaged in the envelope
+    crypto_kdf_hkdf_sha256_expand(creds->p_u, crypto_core_ristretto255_SCALARBYTES, "KG seed", 7, rwd);
+    seen|=(1 << (skU - 1));
+  }
+
   // recalculate non-packaged pkU
   if(cfg->pkU == NotPackaged) {
     if(!(seen & (1 << (skU-1)))) return 1;
@@ -763,10 +775,14 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
   Opaque_Credentials cred;
   sodium_mlock(&cred, sizeof cred);
   // p_u ←_R Z_q
-  randombytes(cred.p_u, crypto_scalarmult_SCALARBYTES); // random user secret key
+  if(cfg->skU != NotPackaged) {
+    randombytes(cred.p_u, crypto_scalarmult_SCALARBYTES); // random user secret key
+  } else {
+    crypto_kdf_hkdf_sha256_expand(cred.p_u, crypto_core_ristretto255_SCALARBYTES, "KG seed", 7, rw);
+  }
 
 #ifdef TRACE
-  dump(_rec, OPAQUE_USER_RECORD_LEN+env_len, "p_u\nplain user rec ");
+  dump(cred.p_u, crypto_core_ristretto255_SCALARBYTES, "p_u ");
 #endif
   // P_s := g^p_s
   crypto_scalarmult_base(rec->P_s, rec->p_s);
@@ -801,15 +817,10 @@ int opaque_init_srv(const uint8_t *pw, const size_t pwlen,
   }
   rec->env_len = env_len;
 
-#ifdef TRACE
-  dump(_rec, OPAQUE_USER_RECORD_LEN+ClrEnv_len, "plain user rec ");
-#endif
-
-
   sodium_munlock(rw, sizeof(rw));
 
 #ifdef TRACE
-  dump(_rec, OPAQUE_USER_RECORD_LEN+ClrEnv_len, "cipher user rec ");
+  dump(_rec, OPAQUE_USER_RECORD_LEN+env_len, "cipher user rec ");
 #endif
   return 0;
 }
@@ -1092,9 +1103,9 @@ int opaque_session_usr_finish(const uint8_t _resp[OPAQUE_SERVER_SESSION_LEN],
     return -1;
   }
 
-  Opaque_Credentials cred;
+  Opaque_Credentials cred={0};
   sodium_mlock(&cred,sizeof cred);
-  if(0!=unpack(cfg, SecEnv, SecEnv_len, ClrEnv, ClrEnv_len, &cred, ids)) {
+  if(0!=unpack(cfg, SecEnv, SecEnv_len, ClrEnv, ClrEnv_len, rw, &cred, ids)) {
     sodium_munlock(&cred,sizeof cred);
     return -1;
   }
@@ -1373,7 +1384,11 @@ int opaque_private_init_usr_respond(const uint8_t *_ctx,
   Opaque_Credentials cred;
   sodium_mlock(&cred, sizeof cred);
   // p_u ←_R Z_q
-  randombytes(cred.p_u, crypto_scalarmult_SCALARBYTES); // random user secret key
+  if(cfg->skU != NotPackaged) {
+    randombytes(cred.p_u, crypto_scalarmult_SCALARBYTES); // random user secret key
+  } else {
+    crypto_kdf_hkdf_sha256_expand(cred.p_u, crypto_core_ristretto255_SCALARBYTES, "KG seed", 7, rw);
+  }
 
   // P_u := g^p_u
   crypto_scalarmult_base(cred.P_u, cred.p_u);

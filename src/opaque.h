@@ -97,6 +97,10 @@ typedef enum {
  * configuration of the opaque envelope fields
  */
 typedef struct {
+  Opaque_PkgTarget skU : 2;  /**< users secret key - must not be
+                                InClrEnv, if it is NotPackaged then
+                                rwdU is used to seed a keygen() via
+                                hkdf-expand() */
   Opaque_PkgTarget pkU : 2;  /**< users public key - if not included
                                 it can be derived from the private
                                 key */
@@ -287,9 +291,11 @@ int opaque_private_init_srv_respond(const uint8_t *alpha, uint8_t sec[OPAQUE_REG
    2nd step of registration: Server evaluates OPRF - Global Server Key Version
 
    This function is essentially the same as
-   opaque_private_init_srv_respond(), except it does not generate a
-   per-user long-term key, but instead expects the servers long-term
-   pubkey as a parameter.
+   opaque_private_init_srv_respond(), except this function does not
+   generate a per-user long-term key, but instead expects the servers
+   to supply a long-term pubkey as a parameter, this might be one
+   unique global key, or it might be a per-user key derived from a
+   server secret.
 
    This function is called CreateRegistrationResponse in the rfc.
    The server receives alpha from the users invocation of its
@@ -370,8 +376,10 @@ void opaque_private_init_srv_finish(const uint8_t sec[OPAQUE_REGISTER_SECRET_LEN
    Final Registration step Global Server Key Version - server adds own info to the record to be stored.
 
    this function essentially does the same as
-   opaque_private_init_srv_finish() except that it needs the global
-   serve secret key as a parameter.
+   opaque_private_init_srv_finish() except that it expects the server
+   to provide its secret key. This server secret key might be one
+   global secret key used for all users, or it might be a per-user
+   unique key derived from a secret server seed.
 
    The rfc does not explicitly specify this function.
    The server combines the sec value from its run of its
