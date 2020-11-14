@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # initialize (device) secret
-[[ -f secret ]] || {
+test -f secret || {
     echo "generating \"secret\""
     dd if=/dev/urandom of=secret bs=32 count=1 2>/dev/null
 }
