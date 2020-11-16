@@ -1,3 +1,1 @@
 * expose crypto_pwhash hardness params in the API
-* expose export_key from envelope through API
-* implement minimum storage variant with synt user keys, and one server master key generating the user seeds with a prf see note https://tools.ietf.org/html/draft-krawczyk-cfrg-opaque-06#page-12

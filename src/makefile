@@ -1,17 +1,11 @@
 PREFIX?=/usr/local
 LIBS=-lsodium
-CFLAGS=-march=native -Wall -fPIC -O2 -g -DTRACE -DNORANDOM $(INC)
+CFLAGS=-march=native -Wall -fPIC -O2 -g $(INC) #-DTRACE -DNORANDOM
 LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
 
 SODIUM_NEWER_THAN_1_0_18 := $(shell pkgconf --atleast-version=1.0.19 libsodium; echo $$?)
-ifeq ($(SODIUM_NEWER_THAN_1_0_18),1)
-	CFLAGS+= -Iaux
-	EXTRA_OBJECTS+= aux/kdf_hkdf_sha256.o
-else
-	CFLAGS+= -DHAVE_SODIUM_HKDF=1
-endif
 
 all: bin libsphinx.so tests
 bin: bin/challenge bin/respond bin/derive bin/2pass
@@ -30,7 +24,7 @@ android: LIBS=-Wl,-Bstatic -Wl,-Bdynamic -lsodiumjni -L.
 android: EXTRA_OBJECTS=jni.o
 android: jni.o libsphinx.so
 
-tests$(EXT): tests/sphinx$(EXT) tests/opaque$(EXT) tests/opaque-munit
+tests$(EXT): tests/sphinx$(EXT)
 
 bin/challenge$(EXT): bin/challenge.c
 	$(CC) $(CFLAGS) -o bin/challenge$(EXT) bin/challenge.c $(LDFLAGS)
@@ -44,20 +38,11 @@ bin/derive$(EXT): bin/derive.c
 bin/2pass$(EXT): bin/2pass.c
 	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS)
 
-libsphinx.$(SOEXT): common.o sphinx.o opaque.o $(EXTRA_OBJECTS)
+libsphinx.$(SOEXT): common.o sphinx.o $(EXTRA_OBJECTS)
 	$(CC) -shared -fpic $(CFLAGS) -o libsphinx.$(SOEXT) $^ $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -L. -lsphinx $(LDFLAGS)
-
-tests/opaque$(EXT): tests/opaque-test.c libsphinx.$(SOEXT)
-	$(CC) $(CFLAGS) -o tests/opaque$(EXT) tests/opaque-test.c -L. -lsphinx $(LDFLAGS)
-
-tests/opaque-munit$(EXT): tests/opaque_munit.c libsphinx.$(SOEXT)
-	$(CC) $(CFLAGS) -o tests/munit-opaque$(EXT) tests/munit/munit.c tests/opaque_munit.c -L. -lsphinx $(LDFLAGS)
-
-test: tests/opaque-munit$(EXT)
-	LD_PRELOAD=./libsphinx.so ./tests/munit-opaque --fatal-failures
 
 win/libsodium-win64:
 	@echo 'win/libsodium-win64 not found.'
@@ -65,7 +50,7 @@ win/libsodium-win64:
 	@echo 'https://download.libsodium.org/libsodium/releases/'
 	@false
 
-install: $(PREFIX)/lib/libsphinx.$(SOEXT) $(PREFIX)/include/sphinx.h $(PREFIX)/include/opaque.h
+install: $(PREFIX)/lib/libsphinx.$(SOEXT) $(PREFIX)/include/sphinx.h
 
 $(PREFIX)/lib/libsphinx.$(SOEXT): libsphinx.$(SOEXT)
 	cp $< $@
@@ -73,15 +58,12 @@ $(PREFIX)/lib/libsphinx.$(SOEXT): libsphinx.$(SOEXT)
 $(PREFIX)/include/sphinx.h: sphinx.h
 	cp $< $@
 
-$(PREFIX)/include/opaque.h: opaque.h
-	cp $< $@
-
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
 	rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so
-	rm -f tests/sphinx tests/opaque tests/sphinx.exe tests/opaque.exe *.o tests/opaque-munit$(EXT)
+	rm -f tests/sphinx tests/sphinx.exe *.o
 	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
 .PHONY: bin clean install
