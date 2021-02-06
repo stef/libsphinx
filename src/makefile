@@ -1,6 +1,6 @@
 PREFIX?=/usr/local
 LIBS=-lsodium
-CFLAGS=-march=native -Wall -fPIC -O2 -g $(INC) #-DTRACE -DNORANDOM
+CFLAGS=-Wall -fPIC -O2 -g $(INC) #-DTRACE -DNORANDOM
 LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
