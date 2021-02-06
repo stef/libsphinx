@@ -43,7 +43,6 @@ package management.
 Building everything should (hopefully) be quite simple afterwards:
 
 ```
-git submodule update --init --recursive --remote
 cd src
 make
 ```
