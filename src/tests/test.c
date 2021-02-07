@@ -17,7 +17,7 @@ int main(void) {
   if(0!=sphinx_respond(chal, secret, resp)) {
     return 1;
   }
-  if(0!=sphinx_finish(pwd, sizeof pwd, bfac, resp, salt, rwd)) {
+  if(0!=sphinx_finish(pwd, strlen((char*) pwd), bfac, resp, salt, rwd)) {
     return 1;
   }
 
