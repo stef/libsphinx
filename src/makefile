@@ -20,7 +20,7 @@ win: win/libsodium-win64 exe libsphinx.$(SOEXT) tests$(EXT)
 exe: bin/challenge$(EXT) bin/respond$(EXT) bin/derive$(EXT)
 
 android: INC=-I$(SODIUM) -I$(SODIUM)/sodium
-android: LIBS=-Wl,-Bstatic -Wl,-Bdynamic -lsodiumjni -L.
+android: LIBS=-Wl,-Bstatic -Wl,-Bdynamic -lsodium -L.
 android: EXTRA_OBJECTS=jni.o
 android: jni.o libsphinx.so
 
