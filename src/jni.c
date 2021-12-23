@@ -55,16 +55,18 @@ JNIEXPORT jbyteArray JNICALL Java_org_hsbp_androsphinx_Sphinx_finish(JNIEnv *env
 	return result ? NULL : rwd;
 }
 
-JNIEXPORT jbyteArray JNICALL Java_org_hsbp_androsphinx_Sodium_genericHash(JNIEnv *env, jobject ignore, jbyteArray msg, jbyteArray salt) {
+JNIEXPORT jbyteArray JNICALL Java_org_hsbp_androsphinx_Sodium_genericHash(JNIEnv *env, jobject ignore, jbyteArray msg, jbyteArray salt, jint outlen) {
+	if (outlen <= 0) return NULL;
+
 	jbyte* bufferPtrMsg  = (*env)->GetByteArrayElements(env, msg,  NULL);
 	jbyte* bufferPtrSalt = (*env)->GetByteArrayElements(env, salt, NULL);
 	jsize msgLen = (*env)->GetArrayLength(env, msg);
 	jsize saltLen = (*env)->GetArrayLength(env, salt);
 
-	jbyteArray hash = (*env)->NewByteArray(env, crypto_generichash_BYTES);
+	jbyteArray hash = (*env)->NewByteArray(env, outlen);
 	jbyte* bufferPtrHash = (*env)->GetByteArrayElements(env, hash, NULL);
 
-	crypto_generichash(bufferPtrHash, crypto_generichash_BYTES,
+	crypto_generichash(bufferPtrHash, outlen,
 			bufferPtrMsg, msgLen, bufferPtrSalt, saltLen);
 
 	(*env)->ReleaseByteArrayElements(env, msg,  bufferPtrMsg, JNI_ABORT);
