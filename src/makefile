@@ -1,6 +1,7 @@
 PREFIX?=/usr/local
+INSTALL?=install
 LIBS=-lsodium
-CFLAGS=-Wall -fPIC -O2 -g $(INC) #-DTRACE -DNORANDOM
+CFLAGS=-Wall -fPIC -O2 -g -Wl,-z,defs $(INC) #-DTRACE -DNORANDOM
 LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
@@ -50,19 +51,19 @@ win/libsodium-win64:
 	@echo 'https://download.libsodium.org/libsodium/releases/'
 	@false
 
-install: $(PREFIX)/lib/libsphinx.$(SOEXT) $(PREFIX)/include/sphinx.h
+install: $(DESTDIR)$(PREFIX)/lib/libsphinx.$(SOEXT) $(DESTDIR)$(PREFIX)/include/sphinx.h
 
-$(PREFIX)/lib/libsphinx.$(SOEXT): libsphinx.$(SOEXT)
-	cp $< $@
+$(DESTDIR)$(PREFIX)/lib/libsphinx.$(SOEXT): libsphinx.$(SOEXT)
+	$(INSTALL) -D $< $@
 
-$(PREFIX)/include/sphinx.h: sphinx.h
-	cp $< $@
+$(DESTDIR)$(PREFIX)/include/sphinx.h: sphinx.h
+	$(INSTALL) -D $< $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -f bin/sphinx bin/challenge bin/respond bin/derive libsphinx.so
+	rm -f bin/sphinx bin/challenge bin/respond bin/derive bin/2pass libsphinx.so
 	rm -f tests/sphinx tests/sphinx.exe *.o
 	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
