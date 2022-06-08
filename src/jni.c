@@ -1,3 +1,24 @@
+/*
+    @copyright 2018-2021, sphinx@ctrlc.hu
+    This file is part of libsphinx.
+
+    SPDX-FileCopyrightText: 2018-21, VSzA
+    SPDX-License-Identifier: LGPL-3.0-or-later
+
+    libsphinx is free software: you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public License
+    as published by the Free Software Foundation, either version 3 of
+    the License, or (at your option) any later version.
+
+    libsphinx is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with libsphinx. If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include <jni.h>
 #include "sphinx.h"
 #include <sodium.h>

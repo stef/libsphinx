@@ -2,6 +2,9 @@
     @copyright 2018-2021, sphinx@ctrlc.hu
     This file is part of libsphinx.
 
+    SPDX-FileCopyrightText: 2018-21, Stefan Marsiske
+    SPDX-License-Identifier: LGPL-3.0-or-later
+
     libsphinx is free software: you can redistribute it and/or
     modify it under the terms of the GNU General Public License
     as published by the Free Software Foundation, either version 3 of
