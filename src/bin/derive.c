@@ -1,20 +1,21 @@
 /*
-    @copyright 2018, pitchfork@ctrlc.hu
-    This file is part of pitchforked sphinx.
+    @copyright 2018-2021, sphinx@ctrlc.hu
+    This file is part of libsphinx.
 
-    pitchforked sphinx is free software: you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public License
+    libsphinx is free software: you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
     as published by the Free Software Foundation, either version 3 of
     the License, or (at your option) any later version.
 
-    pitchfork is distributed in the hope that it will be useful,
+    libsphinx is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with pitchforked sphinx. If not, see <http://www.gnu.org/licenses/>.
+    along with libsphinx. If not, see <http://www.gnu.org/licenses/>.
 */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
