@@ -1,0 +1,7 @@
+libsphinx for Debian
+
+libsphinx is a low-level library implementing cryptographic password storage
+protocol with much stronger security guarantees than your average password
+manager.
+
+ --  <>  Wed, 08 Jun 2022 21:52:52 +0200
