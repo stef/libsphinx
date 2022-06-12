@@ -17,3 +17,10 @@ Description: libsphinx is a low-level library
  implementing cryptographic password storage
  protocol with much stronger security guarantees
  than your average password manager.
+
+Package: libsphinx-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libsphinx (= ${binary:Version}), ${misc:Depends}
+Description: Development files for libsphinx.

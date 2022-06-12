@@ -2,17 +2,6 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: libsphinx
 Upstream-Contact: sphinx@ctrlc.hu
 Source: https://github.com/stef/libsphinx
-Files:     README.md
-           src/bin/2pass.c
-           src/bin/challenge.c
-           src/bin/charsets.h
-           src/bin/derive.c
-           src/bin/respond.c
-           src/common.c
-           src/common.h
-           src/jni.c
-           src/makefile
-           src/sphinx.c
-           src/sphinx.h
+Files:     *
 Copyright: 2018-21 Stefan Marsiske <sphinx@ctrlc.hu>
-License:   LGPL-3.0-or-later
+License:   LGPL-3+
