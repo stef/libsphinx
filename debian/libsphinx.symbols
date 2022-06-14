@@ -1,0 +1,7 @@
+libsphinx.so.0 libsphinx #MINVER#
+ sphinx_blindPW@Base 1.0
+ sphinx_challenge@Base 1.0
+ sphinx_f@Base 1.0
+ sphinx_finish@Base 1.0
+ sphinx_oprf@Base 1.0
+ sphinx_respond@Base 1.0

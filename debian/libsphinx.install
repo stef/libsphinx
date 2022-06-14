@@ -1,1 +1,2 @@
-usr/lib/*/libsphinx.so
+#! /usr/bin/dh-exec
+usr/lib/libsphinx.so => usr/lib/${DEB_HOST_MULTIARCH}/libsphinx.so.0
