@@ -8,7 +8,7 @@ SOEXT=so
 
 SODIUM_NEWER_THAN_1_0_18 := $(shell pkgconf --atleast-version=1.0.19 libsodium; echo $$?)
 
-all: bin libsphinx.so tests
+all: bin libsphinx.$(SOEXT) tests
 bin: bin/challenge bin/respond bin/derive bin/2pass
 
 win: CC=x86_64-w64-mingw32-gcc
@@ -63,7 +63,7 @@ $(DESTDIR)$(PREFIX)/include/sphinx.h: sphinx.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -f bin/sphinx bin/challenge bin/respond bin/derive bin/2pass libsphinx.so
+	rm -f bin/sphinx bin/challenge bin/respond bin/derive bin/2pass libsphinx.$(SOEXT)
 	rm -f tests/sphinx tests/sphinx.exe *.o
 	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
