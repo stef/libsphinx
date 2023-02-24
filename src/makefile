@@ -6,8 +6,6 @@ LDFLAGS=-g $(LIBS)
 CC=gcc
 SOEXT=so
 
-SODIUM_NEWER_THAN_1_0_18 := $(shell pkgconf --atleast-version=1.0.19 libsodium; echo $$?)
-
 all: bin libsphinx.$(SOEXT) tests
 bin: bin/challenge bin/respond bin/derive bin/2pass
 
