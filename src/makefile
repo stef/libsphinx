@@ -1,14 +1,20 @@
 PREFIX?=/usr/local
 INSTALL?=install
 LIBS=-lsodium
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Darwin)
+CFLAGS=-Wall -fPIC -O2 -g $(INC) #-DTRACE -DNORANDOM
+SOEXT=dylib
+SOFLAGS=-Wl,-install_name,libsphinx.$(SOEXT)
+else
 CFLAGS=-Wall -fPIC -O2 -g -Wl,-z,defs $(INC) #-DTRACE -DNORANDOM
+SOEXT=so
+SOFLAGS=-Wl,-soname,libsphinx.$(SOEXT).0
+endif
 LDFLAGS=-g $(LIBS)
 CC=gcc
-SOEXT=so
 
-SODIUM_NEWER_THAN_1_0_18 := $(shell pkgconf --atleast-version=1.0.19 libsodium; echo $$?)
-
-all: bin libsphinx.so tests
+all: bin libsphinx.$(SOEXT) tests
 bin: bin/challenge bin/respond bin/derive bin/2pass
 
 win: CC=x86_64-w64-mingw32-gcc
@@ -40,7 +46,7 @@ bin/2pass$(EXT): bin/2pass.c
 	$(CC) $(CFLAGS) -o bin/2pass$(EXT) bin/2pass.c $(LDFLAGS)
 
 libsphinx.$(SOEXT): common.o sphinx.o $(EXTRA_OBJECTS)
-	$(CC) -shared -fpic $(CFLAGS) -Wl,-soname,libsphinx.so.0 -o libsphinx.$(SOEXT) common.o sphinx.o $(EXTRA_OBJECTS) $(LDFLAGS)
+	$(CC) -shared -fpic $(CFLAGS) $(SOFLAGS) -o libsphinx.$(SOEXT) common.o sphinx.o $(EXTRA_OBJECTS) $(LDFLAGS)
 
 tests/sphinx$(EXT): tests/test.c libsphinx.$(SOEXT)
 	$(CC) $(CFLAGS) -o tests/sphinx$(EXT) tests/test.c -L. -lsphinx $(LDFLAGS)
@@ -63,7 +69,7 @@ $(DESTDIR)$(PREFIX)/include/sphinx.h: sphinx.h
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -f bin/sphinx bin/challenge bin/respond bin/derive bin/2pass libsphinx.so
+	rm -f bin/sphinx bin/challenge bin/respond bin/derive bin/2pass libsphinx.$(SOEXT)
 	rm -f tests/sphinx tests/sphinx.exe *.o
 	rm -f bin/sphinx.exe bin/challenge.exe bin/respond.exe bin/derive.exe libsphinx.dll
 
