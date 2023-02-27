@@ -133,7 +133,10 @@ int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[cry
 
   // resp^(1/bfac) = h(pwd)^secret == H0^k
   unsigned char H0_k[crypto_core_ristretto255_BYTES];
-  if(-1==sodium_mlock(H0_k,sizeof H0_k)) return -1;
+  if(-1==sodium_mlock(H0_k,sizeof H0_k)) {
+     sodium_munlock(ir, sizeof ir);
+     return -1;
+  }
   if (crypto_scalarmult_ristretto255(H0_k, ir, resp) != 0) {
     sodium_munlock(ir, sizeof ir);
     sodium_munlock(H0_k,sizeof H0_k);
