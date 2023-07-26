@@ -38,6 +38,7 @@ int sphinx_respond(const uint8_t chal[crypto_core_ristretto255_BYTES],
                    uint8_t resp[crypto_core_ristretto255_BYTES]);
 int sphinx_finish(const uint8_t *pwd, const size_t p_len,
                   const uint8_t bfac[crypto_core_ristretto255_SCALARBYTES],
+                  const uint8_t chal[crypto_core_ristretto255_BYTES],
                   const uint8_t resp[crypto_core_ristretto255_BYTES],
                   const uint8_t salt[crypto_pwhash_SALTBYTES],
                   uint8_t rwd[crypto_core_ristretto255_BYTES]);

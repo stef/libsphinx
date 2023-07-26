@@ -23,10 +23,12 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <sodium.h>
+#include <string.h>
 
 int main(int argc, char **argv) {
   (void) argc;
   uint8_t blind[crypto_core_ristretto255_SCALARBYTES],
+    chal[crypto_core_ristretto255_BYTES],
     resp[crypto_core_ristretto255_BYTES];
 
   // read response from stdin
@@ -46,6 +48,23 @@ int main(int argc, char **argv) {
     return 1;
   }
   fclose(f);
+
+  // read original challenge from file passed in argv[2]
+  f = fopen(argv[2], "r");
+  if(f==NULL) {
+    fprintf(stderr,"could not open %s\n", argv[2]);
+    return 1;
+  }
+  if(fread(chal, sizeof chal, 1, f)!=1) {
+    fprintf(stderr, "expected 32B challenge in %s\n", argv[2]);
+    return 1;
+  }
+  fclose(f);
+
+  if(memcmp(chal,resp,sizeof resp)==0) {
+    fprintf(stderr, "challenge and response are equal\n");
+    return 1;
+  }
 
   // invert r = 1/r
   unsigned char ir[crypto_core_ristretto255_SCALARBYTES];

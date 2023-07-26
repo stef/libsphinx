@@ -18,7 +18,7 @@ echo "run 1 respond to challenge"
 
 fname=$(cat b)
 echo "run 1 derive password from response"
-{ cat r0; echo -n "shitty master password"; } | ../derive $fname >pwd0
+{ cat r0; echo -n "shitty master password"; } | ../derive $fname c >pwd0
 
 echo "second run"
 echo "run 2 create challenge"
@@ -27,7 +27,7 @@ echo "run 2 respond to challenge"
 ../respond secret <c >r1
 fname=$(cat b)
 echo "run 2 derive password from response"
-{ cat r1; echo -n "shitty master password"; } | ../derive $fname >pwd1
+{ cat r1; echo -n "shitty master password"; } | ../derive $fname c >pwd1
 
 rm c b
 

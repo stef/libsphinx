@@ -119,11 +119,11 @@ Pass the challenge from step 1 on standard input like:
 The response is sent to standard output.
 
 ### step 3 - derive password
-To derive a (currently hex) password, pass the response from step 2 on
-standard input and the filename of the tempfile from step 1 like:
+To derive a (currently hex) password, pass the response from step 2 on standard
+input and the filename of the tempfile and the challenge from step 1 like:
 
 ```
-fname=$(cat b) ./derive $fname <r0 >pwd0
+fname=$(cat b) ./derive $fname c <r0 >pwd0
 ```
 
 The derived password is sent to standard output and currently is a 32

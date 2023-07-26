@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <sodium.h>
 #include "sphinx.h"
+#include <string.h>
 #ifdef TRACE
 #include "common.h"
 #endif
@@ -105,20 +106,30 @@ int sphinx_respond(const uint8_t chal[crypto_core_ristretto255_BYTES], const uin
  * pwd: (input) the password
  * p_len: (input) the password length
  * bfac: (input) bfac from challenge(), array of crypto_core_ristretto255_SCALARBYTES (32) bytes
+ * chal: (input) the challenge generated in sphinx_challenge, crypto_core_ristretto255_BYTES(32) bytes array
  * resp: (input) the response from respond(), crypto_core_ristretto255_BYTES (32) bytes array
  * salt: (input) salt for the final password hashing, crypto_pwhash_SALTBYTES bytes array
  * rwd: (output) the derived password, crypto_core_ristretto255_BYTES (32) bytes array
  * returns -1 on error, 0 on success
  */
-int sphinx_finish(const uint8_t *pwd, const size_t p_len, const uint8_t bfac[crypto_core_ristretto255_SCALARBYTES], const uint8_t resp[crypto_core_ristretto255_BYTES], const uint8_t salt[crypto_pwhash_SALTBYTES], uint8_t rwd[crypto_core_ristretto255_BYTES]) {
+int sphinx_finish(const uint8_t *pwd, const size_t p_len,
+                  const uint8_t bfac[crypto_core_ristretto255_SCALARBYTES],
+                  const uint8_t chal[crypto_core_ristretto255_BYTES],
+                  const uint8_t resp[crypto_core_ristretto255_BYTES],
+                  const uint8_t salt[crypto_pwhash_SALTBYTES],
+                  uint8_t rwd[crypto_core_ristretto255_BYTES]) {
 #ifdef TRACE
   dump(bfac, crypto_core_ristretto255_SCALARBYTES, "r");
+  dump(chal, crypto_core_ristretto255_BYTES, "alpha");
   dump(resp, crypto_core_ristretto255_BYTES, "beta");
   dump(pwd, p_len, "pwd");
   dump(salt, crypto_pwhash_SALTBYTES, "salt");
 #endif
   // Checks that resp ∈ G^∗ . If not, abort;
   if(crypto_core_ristretto255_is_valid_point(resp)!=1) return -1;
+  if(memcmp(chal,resp,crypto_core_ristretto255_BYTES)==0) {
+    return -1;
+  }
 
   // invert bfac = 1/bfac
   unsigned char ir[crypto_core_ristretto255_SCALARBYTES];
