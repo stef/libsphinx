@@ -3,15 +3,15 @@ INSTALL?=install
 LIBS=-lsodium
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Darwin)
-CFLAGS=-Wall -fPIC -O2 -g $(INC) #-DTRACE -DNORANDOM
+CFLAGS+=-Wall -fPIC -O2 -g $(INC) #-DTRACE -DNORANDOM
 SOEXT=dylib
 SOFLAGS=-Wl,-install_name,libsphinx.$(SOEXT)
 else
-CFLAGS=-Wall -fPIC -O2 -g -Wl,-z,defs $(INC) #-DTRACE -DNORANDOM
+CFLAGS+=-Wall -fPIC -O2 -g -Wl,-z,defs $(INC) #-DTRACE -DNORANDOM
 SOEXT=so
 SOFLAGS=-Wl,-soname,libsphinx.$(SOEXT).0
 endif
-LDFLAGS=-g $(LIBS)
+LDFLAGS+=-g $(LIBS)
 CC=gcc
 
 all: bin libsphinx.$(SOEXT) tests
