@@ -44,7 +44,7 @@ jobs:
     - run: |
        cd src
        sudo apt-get update
-       sudo apt-get install python3 libsodium-dev pkgconf
+       sudo apt-get install libsodium-dev pkgconf
        make bin libsphinx.so tests/sphinx
      
     - name: Perform CodeQL Analysis
