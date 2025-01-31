@@ -1,3 +1,11 @@
+# THIS PROJECT IS EOL
+
+libsphinx has been replaced by liboprf https://github.com/stef/liboprf.
+it is here only for usage in the v1-legacy branch of pwdsphinx
+http://github.com/stef/pwdsphinx
+
+## About
+
 sphinx: a password **S**tore that **P**erfectly **H**ides from **I**tself
 (**N**o **X**aggeration)
 
